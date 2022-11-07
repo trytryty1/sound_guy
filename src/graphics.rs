@@ -12,12 +12,11 @@ mod model;
 
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
-use crate::audio_in;
-use crate::graphics::model::Mesh;
+use crate::AUDIO_IN;
 use crate::graphics::model::Vertex;
 
 
-const BACKGROUND_COLOR: [f64; 3] = [0.02,0.02,0.02];
+const BACKGROUND_COLOR: [f64; 4] = [0.0,0.0,0.0,0.0];
 
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
@@ -135,7 +134,6 @@ impl CameraController {
         use cgmath::InnerSpace;
         let forward = camera.target - camera.eye;
         let forward_norm = forward.normalize();
-        let forward_mag = forward.magnitude();
 
         let right = forward_norm.cross(camera.up);
         // Redo radius calc in case the up/ down is pressed.
@@ -414,7 +412,7 @@ impl State {
         self.queue.write_buffer(
             &self.audio_in_buffer,
             0,
-            &(audio_in).to_ne_bytes(),
+            &(AUDIO_IN).to_ne_bytes(),
         );
     }
 
@@ -438,10 +436,10 @@ impl State {
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.0,
-                            g: 0.0,
-                            b: 0.0,
-                            a: 0.0,
+                            r: BACKGROUND_COLOR[0],
+                            g: BACKGROUND_COLOR[1],
+                            b: BACKGROUND_COLOR[2],
+                            a: BACKGROUND_COLOR[3],
                         }),
                         store: true,
                     },
@@ -568,7 +566,7 @@ pub async fn run() {
     });
 }
 
-static mut take_focus: bool = true;
+static mut TAKE_FOCUS: bool = true;
 
 fn window_events(window: &mut Window, event: &WindowEvent) {
     match event {
@@ -585,9 +583,8 @@ fn window_events(window: &mut Window, event: &WindowEvent) {
             match keycode {
                 VirtualKeyCode::LControl => unsafe {
                     if is_pressed {
-                        window.set_cursor_hittest(take_focus).expect("TODO: panic message");
-                        println!("{}", take_focus);
-                        take_focus = !take_focus;
+                        window.set_cursor_hittest(TAKE_FOCUS).expect("TODO: panic message");
+                        TAKE_FOCUS = !TAKE_FOCUS;
                     }
                 }
 
@@ -595,8 +592,7 @@ fn window_events(window: &mut Window, event: &WindowEvent) {
             }
         },
         WindowEvent::MouseInput {
-            device_id: DeviceId,
-            modifiers: ModifiersState, ..
+            ..
         } => {
             window.drag_window().expect("TODO: panic message");
         }

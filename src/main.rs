@@ -14,13 +14,6 @@ mod texture;
 
 use clap::Parser;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use ringbuf::HeapRb;
-use core::{
-    convert::{TryFrom, TryInto},
-    mem::{size_of, size_of_val},
-};
-use std::sync::{Arc, Mutex};
-use std::{thread, time};
 use cpal::Stream;
 
 
@@ -51,7 +44,7 @@ struct Opt {
     jack: bool,
 }
 
-pub static mut audio_in: f32 = 0.0;
+pub static mut AUDIO_IN: f32 = 0.0;
 
 fn main() {
 
@@ -107,18 +100,18 @@ fn setup_feedback() -> Stream {
 
     println!("Using input device: \"{}\"", match input_device.name() {
         Ok(t) => t,
-        Err(e) => panic!("ERROR")
+        Err(_) => panic!("ERROR")
     });
 
     // We'll try and use the same configuration between streams to keep it simple.
     let config: cpal::StreamConfig = match input_device.default_input_config() {
         Ok(t) => t.into(),
-        Err(e) => panic!("Config is brok")
+        Err(_) => panic!("Config is brok")
     };
 
     let input_data_fn = move |data: &[f32], _: &cpal::InputCallbackInfo| unsafe {
         for &sample in data {
-            audio_in = f32::max(audio_in, f32::sqrt(sample*2.0)) - audio_in * 0.00002;
+            AUDIO_IN = f32::max(AUDIO_IN, f32::sqrt(sample*2.0)) - AUDIO_IN * 0.00002;
         }
     };
 
@@ -129,7 +122,7 @@ fn setup_feedback() -> Stream {
     );
     let input_stream = match input_device.build_input_stream(&config, input_data_fn, err_fn) {
         Ok(t) => t,
-        Err(e) => panic!("NOOOOOO!")
+        Err(_) => panic!("NOOOOOO!")
     };
     println!("Successfully built streams.");
 
@@ -149,6 +142,6 @@ fn setup_feedback() -> Stream {
 
 
 
-fn err_fn(err: cpal::StreamError) {
-    eprintln!("an error occurred on stream: {}", err);
+fn err_fn(_: cpal::StreamError) {
+    eprintln!("an error occurred on stream: {}", "Audio input stream");
 }

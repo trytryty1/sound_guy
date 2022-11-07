@@ -1,10 +1,5 @@
 use crate::graphics::model::{Mesh, Vertex};
 
-struct Avatar {
-    radius: u32,
-    detail: u32,
-}
-
 pub fn gen_fibonacci_mesh() -> Mesh { //-> &[Vertex] {
     let samples = 250;
 
@@ -51,10 +46,4 @@ fn fibonacci_sphere_points(samples: u32) -> Vec<(f32, f32, f32)> {
     }
 
     return points;
-}
-
-impl Avatar {
-
-
-
 }
