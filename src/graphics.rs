@@ -7,7 +7,6 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
-mod texture;
 mod avatar;
 
 #[cfg(target_arch="wasm32")]
