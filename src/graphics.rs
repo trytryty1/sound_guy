@@ -8,65 +8,16 @@ use winit::{
 };
 
 mod avatar;
+mod model;
 
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
 use crate::audio_in;
+use crate::graphics::model::Mesh;
+use crate::graphics::model::Vertex;
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct Vertex {
-    position: [f32; 3],
-    color: [f32; 3],
-    index: f32,
-}
-
-impl Vertex {
-    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
-        use std::mem;
-        wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<Vertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    shader_location: 0,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-                wgpu::VertexAttribute {
-                    offset: mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                    shader_location: 1,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-                wgpu::VertexAttribute {
-                    offset: mem::size_of::<f32>() as wgpu::BufferAddress,
-                    shader_location: 2,
-                    format: wgpu::VertexFormat::Float32,
-                },
-            ],
-        }
-    }
-}
 
 const BACKGROUND_COLOR: [f64; 3] = [0.02,0.02,0.02];
-const VERTICES: &[Vertex] = &[
-];
-
-pub struct Mesh {
-    vertices: Vec<Vertex>,
-    indices: Vec<u16>,
-}
-
-impl Mesh {
-    fn new(vertices: Vec<Vertex>, indices: Vec<u16>) -> Mesh {
-        Mesh {
-            vertices,
-            indices,
-        }
-    }
-}
-
-const INDICES: &[u16] = &[];
 
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
@@ -398,17 +349,19 @@ impl State {
             multiview: None,
         });
 
+        let model = model::Mesh::new_empty();
+
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(VERTICES),
+            contents: bytemuck::cast_slice(&model.vertices[..]),
             usage: wgpu::BufferUsages::VERTEX,
         });
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(INDICES),
+            contents: bytemuck::cast_slice(&model.indices[..]),
             usage: wgpu::BufferUsages::INDEX,
         });
-        let num_indices = INDICES.len() as u32;
+        let num_indices = model.indices.len() as u32;
 
         Self {
             surface,
@@ -615,7 +568,7 @@ pub async fn run() {
     });
 }
 
-static mut take_focus: bool = false;
+static mut take_focus: bool = true;
 
 fn window_events(window: &mut Window, event: &WindowEvent) {
     match event {

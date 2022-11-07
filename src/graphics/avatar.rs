@@ -1,4 +1,4 @@
-use crate::graphics::{Mesh, Vertex};
+use crate::graphics::model::{Mesh, Vertex};
 
 struct Avatar {
     radius: u32,
