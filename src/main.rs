@@ -10,16 +10,20 @@
 extern crate core;
 
 mod graphics;
+mod texture;
 
 use clap::Parser;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use ringbuf::HeapRb;
-use beryllium::*;
 use core::{
     convert::{TryFrom, TryInto},
     mem::{size_of, size_of_val},
 };
-use ogl33::*;
+use std::sync::{Arc, Mutex};
+use std::{thread, time};
+use cpal::Stream;
+
+
 
 #[derive(Parser, Debug)]
 #[command(version, about = "CPAL feedback example", long_about = None)]
@@ -27,10 +31,6 @@ struct Opt {
     /// The input audio device to use
     #[arg(short, long, value_name = "IN", default_value_t = String::from("default"))]
     input_device: String,
-
-    /// The output audio device to use
-    #[arg(short, long, value_name = "OUT", default_value_t = String::from("default"))]
-    output_device: String,
 
     /// Specify the delay between input and output
     #[arg(short, long, value_name = "DELAY_MS", default_value_t = 150.0)]
@@ -51,14 +51,20 @@ struct Opt {
     jack: bool,
 }
 
+pub static mut audio_in: f32 = 0.0;
+
 fn main() {
 
-    //setup_feedback();
-    graphics::setup_window();
+    let stream = setup_feedback();
+    //graphics::run();
+
+    pollster::block_on(graphics::run());
+
+    drop(stream);
 }
 
 // Consumes the thread until done with feedback
-fn setup_feedback() {
+fn setup_feedback() -> Stream {
     let opt = Opt::parse();
 
     // Conditionally compile with jack if the feature is specified.
@@ -99,14 +105,7 @@ fn setup_feedback() {
     let input_device = host.default_input_device()
         .expect("failed to find input device");
 
-    let output_device = host.default_output_device()
-        .expect("failed to find output device");
-
     println!("Using input device: \"{}\"", match input_device.name() {
-        Ok(t) => t,
-        Err(e) => panic!("ERROR")
-    });
-    println!("Using output device: \"{}\"", match output_device.name() {
         Ok(t) => t,
         Err(e) => panic!("ERROR")
     });
@@ -117,47 +116,9 @@ fn setup_feedback() {
         Err(e) => panic!("Config is brok")
     };
 
-    // Create a delay in case the input and output devices aren't synced.
-    let latency_frames = (opt.latency / 1_000.0) * config.sample_rate.0 as f32;
-    let latency_samples = latency_frames as usize * config.channels as usize;
-
-    // The buffer to share samples
-    let ring = HeapRb::<f32>::new(latency_samples * 2);
-    let (mut producer, mut consumer) = ring.split();
-
-    // Fill the samples with 0.0 equal to the length of the delay.
-    for _ in 0..latency_samples {
-        // The ring buffer has twice as much space as necessary to add latency here,
-        // so this should never fail
-        producer.push(0.0).unwrap();
-    }
-
-    let input_data_fn = move |data: &[f32], _: &cpal::InputCallbackInfo| {
-        let mut output_fell_behind = false;
+    let input_data_fn = move |data: &[f32], _: &cpal::InputCallbackInfo| unsafe {
         for &sample in data {
-            println!("{}", sample);
-            if producer.push(sample).is_err() {
-                output_fell_behind = true;
-            }
-        }
-        if output_fell_behind {
-            eprintln!("output stream fell behind: try increasing latency");
-        }
-    };
-
-    let output_data_fn = move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-        let mut input_fell_behind = false;
-        for sample in data {
-            *sample = match consumer.pop() {
-                Some(s) => s,
-                None => {
-                    input_fell_behind = true;
-                    0.0
-                }
-            };
-        }
-        if input_fell_behind {
-            eprintln!("input stream fell behind: try increasing latency");
+            audio_in = f32::max(audio_in, f32::sqrt(sample*2.0)) - audio_in * 0.00002;
         }
     };
 
@@ -170,10 +131,6 @@ fn setup_feedback() {
         Ok(t) => t,
         Err(e) => panic!("NOOOOOO!")
     };
-    let output_stream = match output_device.build_output_stream(&config, output_data_fn, err_fn) {
-        Ok(t) => t,
-        Err(e) => panic!("NOOOOOO!")
-    };
     println!("Successfully built streams.");
 
     // Play the streams.
@@ -181,15 +138,13 @@ fn setup_feedback() {
         "Starting the input and output streams with `{}` milliseconds of latency.",
         opt.latency
     );
-    input_stream.play();
-    output_stream.play();
 
-    // Run for 3 seconds before closing.
-    println!("Playing for 3 seconds... ");
-    std::thread::sleep(std::time::Duration::from_secs(20));
-    drop(input_stream);
-    drop(output_stream);
-    println!("Done!");
+
+    input_stream.play().expect("TODO: panic message");
+
+    //thread::sleep(time::Duration::from_millis(10000));
+
+    input_stream
 }
 
 
