@@ -1,4 +1,7 @@
+use std::borrow::Cow;
 use std::iter;
+use image::io::Reader;
+use image::RgbImage;
 
 use wgpu::util::DeviceExt;
 use winit::{
@@ -6,158 +9,24 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
 };
+use winit::dpi::{LogicalSize, PhysicalSize};
+use winit::platform::windows::{IconExtWindows, WindowBuilderExtWindows};
+use winit::window::{BadIcon, Icon};
 
 mod avatar;
 mod model;
+mod camera;
 
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
 use crate::AUDIO_IN;
+use crate::graphics::camera::{Camera, CameraController, CameraUniform};
 use crate::graphics::model::Vertex;
 
 
 const BACKGROUND_COLOR: [f64; 4] = [0.0,0.0,0.0,0.0];
 
 #[rustfmt::skip]
-pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
-    1.0, 0.0, 0.0, 0.0,
-    0.0, 1.0, 0.0, 0.0,
-    0.0, 0.0, 0.5, 0.0,
-    0.0, 0.0, 0.5, 1.0,
-);
-
-struct Camera {
-    eye: cgmath::Point3<f32>,
-    target: cgmath::Point3<f32>,
-    up: cgmath::Vector3<f32>,
-    aspect: f32,
-    fovy: f32,
-    znear: f32,
-    zfar: f32,
-}
-
-impl Camera {
-    fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
-        let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
-        let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
-        proj * view
-    }
-}
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-struct CameraUniform {
-    view_proj: [[f32; 4]; 4],
-}
-
-impl CameraUniform {
-    fn new() -> Self {
-        use cgmath::SquareMatrix;
-        Self {
-            view_proj: cgmath::Matrix4::identity().into(),
-        }
-    }
-
-    fn update_view_proj(&mut self, camera: &Camera) {
-        self.view_proj = (OPENGL_TO_WGPU_MATRIX * camera.build_view_projection_matrix()).into();
-    }
-}
-
-struct CameraController {
-    speed: f32,
-    is_up_pressed: bool,
-    is_down_pressed: bool,
-    is_forward_pressed: bool,
-    is_backward_pressed: bool,
-    is_left_pressed: bool,
-    is_right_pressed: bool,
-}
-
-impl CameraController {
-    fn new(speed: f32) -> Self {
-        Self {
-            speed,
-            is_up_pressed: false,
-            is_down_pressed: false,
-            is_forward_pressed: false,
-            is_backward_pressed: false,
-            is_left_pressed: false,
-            is_right_pressed: false,
-        }
-    }
-
-    fn process_events(&mut self, event: &WindowEvent) -> bool {
-        match event {
-            WindowEvent::KeyboardInput {
-                input:
-                KeyboardInput {
-                    state,
-                    virtual_keycode: Some(keycode),
-                    ..
-                },
-                ..
-            } => {
-                let is_pressed = *state == ElementState::Pressed;
-                match keycode {
-                    VirtualKeyCode::Space => {
-                        self.is_up_pressed = is_pressed;
-                        true
-                    }
-                    VirtualKeyCode::LShift => {
-                        self.is_down_pressed = is_pressed;
-                        true
-                    }
-                    VirtualKeyCode::W | VirtualKeyCode::Up => {
-                        self.is_forward_pressed = is_pressed;
-                        true
-                    }
-                    VirtualKeyCode::A | VirtualKeyCode::Left => {
-                        self.is_left_pressed = is_pressed;
-                        true
-                    }
-                    VirtualKeyCode::S | VirtualKeyCode::Down => {
-                        self.is_backward_pressed = is_pressed;
-                        true
-                    }
-                    VirtualKeyCode::D | VirtualKeyCode::Right => {
-                        self.is_right_pressed = is_pressed;
-                        true
-                    }
-                    _ => false,
-                }
-            }
-            _ => false,
-        }
-    }
-
-    fn update_camera(&self, camera: &mut Camera) {
-        use cgmath::InnerSpace;
-        let forward = camera.target - camera.eye;
-        let forward_norm = forward.normalize();
-
-        let right = forward_norm.cross(camera.up);
-        // Redo radius calc in case the up/ down is pressed.
-        let forward = camera.target - camera.eye;
-        let forward_mag = forward.magnitude();
-
-        // Prevents glitching when camera gets too close to the
-        // center of the scene.
-        if self.is_forward_pressed && forward_mag > self.speed {
-            camera.eye += forward_norm * self.speed;
-        } else if self.is_backward_pressed {
-            camera.eye -= forward_norm * self.speed;
-        } else if self.is_right_pressed {
-            // Rescale the distance between the target and eye so
-            // that it doesn't change. The eye therefore still
-            // lies on the circle made by the target and eye.
-            camera.eye = camera.target - (forward + right * self.speed).normalize() * forward_mag;
-        } else if self.is_left_pressed {
-            camera.eye = camera.target - (forward - right * self.speed).normalize() * forward_mag;
-        } else {
-            camera.eye = camera.target - (forward - right * self.speed * 0.2).normalize() * forward_mag;
-        }
-    }
-}
 
 struct State {
     surface: wgpu::Surface,
@@ -381,6 +250,47 @@ impl State {
         }
     }
 
+    fn new_compute_shader(&mut self) {
+        let cs_module = self.device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: None,
+            source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(include_str!("outer_shell.wgsl"))),
+        });
+
+        let staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size,
+            usage: wgpu::BufferUsage::MAP_READ | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let storage_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Storage Buffer"),
+            contents: bytemuck::cast_slice(&[[0.0,0.0,0.0]; 50]),
+            usage: wgpu::BufferUsage::STORAGE |
+                wgpu::BufferUsage::COPY_DST |
+                wgpu::BufferUsage::COPY_SRC,
+        });
+
+        let compute_pipeline = self.device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: None,
+            layout: None,
+            module: &cs_module,
+            entry_point: "main",
+        });
+
+        let bind_group_layout = compute_pipeline.get_bind_group_layout(0);
+        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label:None,
+            layout: &bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: storage_buffer.as_entire_binding(),
+            }],
+        });
+
+        let
+    }
+
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
             self.size = new_size;
@@ -474,10 +384,15 @@ pub async fn run() {
     }
 
     let event_loop = EventLoop::new();
+
     let mut window = WindowBuilder::new()
         .with_decorations(false)
         .with_transparent(true)
         .with_always_on_top(true)
+        .with_inner_size(LogicalSize::new(400.0,400.0))
+        .with_title("sound_guy")
+        .with_taskbar_icon(Some(load_icon()))
+        .with_window_icon(Some(load_icon()))
         .build(&event_loop)
         .unwrap();
     
@@ -561,12 +476,43 @@ pub async fn run() {
                 // request it.
                 window.request_redraw();
             }
+            Event::DeviceEvent {
+                event,
+                ..
+            } => {
+                device_events(&mut window, &event);
+            }
             _ => {}
         }
     });
 }
 
 static mut TAKE_FOCUS: bool = true;
+
+fn device_events(window: &mut Window, event: &DeviceEvent) {
+    match event {
+        DeviceEvent::Added => {}
+        DeviceEvent::Removed => {}
+        DeviceEvent::MouseMotion { .. } => {}
+        DeviceEvent::MouseWheel { .. } => {}
+        DeviceEvent::Motion { .. } => {}
+        DeviceEvent::Button { .. } => {}
+        DeviceEvent::Key(input) => {
+            let is_pressed = input.state == ElementState::Pressed;
+            match input.virtual_keycode.unwrap() {
+                VirtualKeyCode::RControl => unsafe {
+                    if is_pressed {
+                        window.set_cursor_hittest(TAKE_FOCUS).expect("TODO: panic message");
+                        window.set_decorations(TAKE_FOCUS);
+                        TAKE_FOCUS = !TAKE_FOCUS;
+                    }
+                }
+                _ => {}
+            }
+        }
+        DeviceEvent::Text { .. } => {}
+    }
+}
 
 fn window_events(window: &mut Window, event: &WindowEvent) {
     match event {
@@ -581,11 +527,8 @@ fn window_events(window: &mut Window, event: &WindowEvent) {
         } => {
             let is_pressed = *state == ElementState::Pressed;
             match keycode {
-                VirtualKeyCode::LControl => unsafe {
-                    if is_pressed {
-                        window.set_cursor_hittest(TAKE_FOCUS).expect("TODO: panic message");
-                        TAKE_FOCUS = !TAKE_FOCUS;
-                    }
+                VirtualKeyCode::LControl => {
+
                 }
 
                 _ => {}
@@ -598,4 +541,17 @@ fn window_events(window: &mut Window, event: &WindowEvent) {
         }
         _ => {}
     };
+}
+
+fn load_icon() -> Icon {
+    let (icon_rgba, icon_width, icon_height) = {
+        let image = image::open("C:\\Users\\wing_\\IdeaProjects\\sound_guy\\src\\wall.png")
+            .expect("Failed to open icon path")
+            .into_rgba8();
+        let (width, height) = image.dimensions();
+        let rgba = image.into_raw();
+        (rgba, width, height)
+    };
+
+    Icon::from_rgba(icon_rgba, icon_width, icon_height).unwrap()
 }

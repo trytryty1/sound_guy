@@ -1,10 +1,3 @@
-//! Feeds back the input stream directly into the output stream.
-//!
-//! Assumes that the input and output devices can use the same stream configuration and that they
-//! support the f32 sample format.
-//!
-//! Uses a delay of `LATENCY_MS` milliseconds in case the default input and output streams are not
-//! precisely synchronised.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 extern crate core;
@@ -15,7 +8,8 @@ mod texture;
 use clap::Parser;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::Stream;
-
+use image::{DynamicImage, ImageResult, RgbImage};
+use image::io::Reader;
 
 
 #[derive(Parser, Debug)]
@@ -44,15 +38,18 @@ struct Opt {
     jack: bool,
 }
 
+// Float that stores the loudest audio input detected over the las few milliseconds
 pub static mut AUDIO_IN: f32 = 0.0;
+const AUDIO_DIFFUSE: f32 = 0.00005;
 
 fn main() {
-
+    // Setup the audio stream
     let stream = setup_feedback();
-    //graphics::run();
 
+    // Setup the window and graphics
     pollster::block_on(graphics::run());
 
+    // Destroy the audio steam
     drop(stream);
 }
 
@@ -109,9 +106,13 @@ fn setup_feedback() -> Stream {
         Err(_) => panic!("Config is brok")
     };
 
+    // Call back for when the audio input device get audio
     let input_data_fn = move |data: &[f32], _: &cpal::InputCallbackInfo| unsafe {
         for &sample in data {
-            AUDIO_IN = f32::max(AUDIO_IN, f32::sqrt(sample*2.0)) - AUDIO_IN * 0.00002;
+
+            // Increases AUDIO_IN if the input is louder and decrease it gradually
+            //let var = if sample < 0.1 {0.0} else {}
+            AUDIO_IN = f32::max(AUDIO_IN, if sample < 0.03 {0.0} else {f32::sqrt(sample*2.0)}) - AUDIO_IN * AUDIO_DIFFUSE;
         }
     };
 

@@ -1,3 +1,4 @@
+
 // Vertex shader
 struct CameraUniform {
     view_proj: mat4x4<f32>,
@@ -25,7 +26,7 @@ fn vs_main(
 ) -> VertexOutput {
     var out: VertexOutput;
     out.color = model.color;
-    out.clip_position = camera.view_proj * vec4<f32>(model.position.xyz * audio_in, 1.0); // 2.
+    out.clip_position = camera.view_proj * vec4<f32>(model.position.xyz * ((audio_in/2.0)+0.5) , 1.0); // 2.
     return out;
 }
 
@@ -35,3 +36,7 @@ fn vs_main(
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     return vec4<f32>(in.color, 0.0);
 }
+
+
+// Compute shader
+@compute

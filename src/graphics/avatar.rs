@@ -1,4 +1,54 @@
+use wgpu::ShaderLocation;
 use crate::graphics::model::{Mesh, Vertex};
+
+struct Avatar {
+    sphere_mesh: Mesh,
+    outer_mesh: Mesh,
+    outer_mesh_compute_shader: ShaderLocation,
+}
+
+impl Avatar {
+    pub fn new(sphere_mesh: Mesh, outer_mesh: Mesh) -> Self {
+
+
+
+        Self {
+            sphere_mesh,
+            outer_mesh,
+        }
+    }
+
+    pub fn update(&mut self) {
+
+    }
+}
+
+pub fn gen_outer_mesh() -> Mesh {
+    let samples = 50;
+
+    let points = fibonacci_sphere_points(samples);
+
+    let mut vertices: Vec<Vertex> = Vec::new();
+    let mut indices: Vec<u16> = Vec::new();
+
+    for (index, (x, y , z)) in points.into_iter().enumerate() {
+        let r:f32 = (x + 1.0)/2.0;
+        let g:f32 = (y + 1.0)/2.0;
+        let b:f32 = (z + 1.0)/2.0;
+
+        vertices.push(Vertex {position: [x*1.5, y*1.5, z*1.5],
+            color:[r,g,b],
+            index: if index % 11 == 0 {1.0} else {0.0}});
+
+        indices.push(0);
+        indices.push(index as u16);
+
+    }
+
+    Mesh::new(vertices, indices)
+
+}
+
 
 pub fn gen_fibonacci_mesh() -> Mesh { //-> &[Vertex] {
     let samples = 250;
