@@ -1,25 +1,170 @@
-use wgpu::ShaderLocation;
+use clap::parser::Indices;
+use wgpu::{BindGroup, Buffer, Queue, RenderPass, RenderPipeline, ShaderLocation};
+use wgpu::util::DeviceExt;
+use crate::AUDIO_IN;
 use crate::graphics::model::{Mesh, Vertex};
+use crate::graphics::renderer::{RenderBatch};
+use crate::graphics::State;
 
-struct Avatar {
-    sphere_mesh: Mesh,
-    outer_mesh: Mesh,
-    outer_mesh_compute_shader: ShaderLocation,
+pub(crate) struct Avatar {
+    mesh: Mesh,
+    render_pipeline: RenderPipeline,
+    vertex_buffer: Buffer,
+    index_buffer: Buffer,
+    audio_bind_group: BindGroup,
+    audio_in_buffer: Buffer,
 }
 
 impl Avatar {
-    pub fn new(sphere_mesh: Mesh, outer_mesh: Mesh) -> Self {
+
+    pub fn build_avatar(state: &State) -> Avatar {
+        let camera_bind_group = &state.camera_bind_group;
+
+        let audio_bind_group_layout =
+            state.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+                label: Some("audio_in_bind_group_layout"),
+            });
+
+        let audio_buffer = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("audio_in"),
+            contents: &[0,0,0,0],
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let audio_bind_group = state.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &audio_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: audio_buffer.as_entire_binding(),
+            }],
+            label: Some("audio_in_bind_group"),
+        });
+
+        let shader = state.device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
+        });
+
+        let render_pipeline_layout =
+            state.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Render Pipeline Layout"),
+                bind_group_layouts: &[&state.camera_bind_group_layout, &audio_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let render_pipeline = state.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: "vs_main",
+                buffers: &[Vertex::desc()],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: "fs_main",
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: state.config.format,
+                    blend: Some(wgpu::BlendState {
+                        color: wgpu::BlendComponent::REPLACE,
+                        alpha: wgpu::BlendComponent::OVER,
+                    }),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::LineList,
+                front_face: wgpu::FrontFace::Ccw,
+                ..Default::default()
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            // If the pipeline will be used with a multiview render pass, this
+            // indicates how many array layers the attachments will have.
+            multiview: None,
+        });
+
+        let model = gen_fibonacci_mesh();
+
+        let vertex_buffer = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(&model.vertices[..]),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        let index_buffer = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Index Buffer"),
+            contents: bytemuck::cast_slice(&model.indices[..]),
+            usage: wgpu::BufferUsages::INDEX,
+        });
+        let num_indices = model.indices.len() as u32;
 
 
 
-        Self {
-            sphere_mesh,
-            outer_mesh,
+        Avatar {
+            mesh: model,
+            render_pipeline,
+            vertex_buffer,
+            index_buffer,
+            audio_bind_group,
+            audio_in_buffer: audio_buffer,
         }
     }
 
-    pub fn update(&mut self) {
+}
 
+impl RenderBatch for Avatar {
+
+    fn get_pipeline(&self) -> Option<&RenderPipeline> {
+        Some(&self.render_pipeline)
+    }
+
+    fn bind_group<'a, 'b>(&'a self, render_pass: &'b mut RenderPass<'a>, camera_bind_group: &'a BindGroup) where 'a: 'b {
+        render_pass.set_bind_group(0, &camera_bind_group, &[]);
+        render_pass.set_bind_group(1, &self.audio_bind_group, &[]);
+    }
+
+    fn get_vertex_buffer(&self) -> &Buffer {
+        &self.vertex_buffer
+    }
+
+    fn get_index_buffer(&self) -> &Buffer {
+        &self.index_buffer
+    }
+
+    fn get_vertices(&self) -> &[Vertex] {
+        &self.mesh.vertices[..]
+    }
+
+    fn get_indices(&self) -> &[u16] {
+        &self.mesh.indices[..]
+    }
+
+    fn get_indices_count(&self) -> u32 {
+        self.mesh.indices.len() as u32
+    }
+
+    fn write_buffer(&self, queue: &mut Queue) {
+        unsafe {
+            queue.write_buffer(
+                &self.audio_in_buffer,
+                0,
+                &(AUDIO_IN).to_ne_bytes(),
+            );
+        }
     }
 }
 

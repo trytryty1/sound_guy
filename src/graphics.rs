@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::iter;
 use image::io::Reader;
 use image::RgbImage;
+use wgpu::BindGroupLayout;
 
 use wgpu::util::DeviceExt;
 use winit::{
@@ -16,12 +17,15 @@ use winit::window::{BadIcon, Icon};
 mod avatar;
 mod model;
 mod camera;
+mod renderer;
 
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
 use crate::AUDIO_IN;
+use crate::graphics::avatar::Avatar;
 use crate::graphics::camera::{Camera, CameraController, CameraUniform};
 use crate::graphics::model::Vertex;
+use crate::graphics::renderer::Renderer;
 
 
 const BACKGROUND_COLOR: [f64; 4] = [0.0,0.0,0.0,0.0];
@@ -34,19 +38,14 @@ struct State {
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
-    render_pipeline: wgpu::RenderPipeline,
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
-    num_indices: u32,
-    // NEW!
+
+    // Camera stuff
     camera: Camera,
+    camera_bind_group_layout: BindGroupLayout,
     camera_controller: CameraController,
     camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
-
-    audio_in_buffer: wgpu::Buffer,
-    audio_in_bind_group: wgpu::BindGroup,
 }
 
 impl State {
@@ -114,12 +113,6 @@ impl State {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let audio_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("audio_in"),
-            contents: &[0,0,0,0],
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-
         let camera_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[wgpu::BindGroupLayoutEntry {
@@ -135,21 +128,6 @@ impl State {
                 label: Some("camera_bind_group_layout"),
             });
 
-        let audio_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }],
-                label: Some("audio_in_bind_group_layout"),
-            });
-
         let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &camera_bind_group_layout,
             entries: &[wgpu::BindGroupEntry {
@@ -159,136 +137,21 @@ impl State {
             label: Some("camera_bind_group"),
         });
 
-        let audio_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &audio_bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: audio_buffer.as_entire_binding(),
-            }],
-            label: Some("audio_in_bind_group"),
-        });
-
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
-        });
-
-        let render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[&camera_bind_group_layout, &audio_bind_group_layout],
-                push_constant_ranges: &[],
-            });
-
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Render Pipeline"),
-            layout: Some(&render_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "vs_main",
-                buffers: &[Vertex::desc()],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
-                    blend: Some(wgpu::BlendState {
-                        color: wgpu::BlendComponent::REPLACE,
-                        alpha: wgpu::BlendComponent::OVER,
-                    }),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::LineList,
-                front_face: wgpu::FrontFace::Ccw,
-                ..Default::default()
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            // If the pipeline will be used with a multiview render pass, this
-            // indicates how many array layers the attachments will have.
-            multiview: None,
-        });
-
-        let model = model::Mesh::new_empty();
-
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(&model.vertices[..]),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(&model.indices[..]),
-            usage: wgpu::BufferUsages::INDEX,
-        });
-        let num_indices = model.indices.len() as u32;
-
         Self {
             surface,
             device,
             queue,
             config,
             size,
-            render_pipeline,
-            vertex_buffer,
-            index_buffer,
-            num_indices,
+
+
             camera,
+            camera_bind_group_layout,
             camera_controller,
             camera_buffer,
             camera_bind_group,
             camera_uniform,
-            audio_in_buffer: audio_buffer,
-            audio_in_bind_group: audio_bind_group,
         }
-    }
-
-    fn new_compute_shader(&mut self) {
-        let cs_module = self.device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: None,
-            source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(include_str!("outer_shell.wgsl"))),
-        });
-
-        let staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: None,
-            size,
-            usage: wgpu::BufferUsage::MAP_READ | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-
-        let storage_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Storage Buffer"),
-            contents: bytemuck::cast_slice(&[[0.0,0.0,0.0]; 50]),
-            usage: wgpu::BufferUsage::STORAGE |
-                wgpu::BufferUsage::COPY_DST |
-                wgpu::BufferUsage::COPY_SRC,
-        });
-
-        let compute_pipeline = self.device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: None,
-            layout: None,
-            module: &cs_module,
-            entry_point: "main",
-        });
-
-        let bind_group_layout = compute_pipeline.get_bind_group_layout(0);
-        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label:None,
-            layout: &bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: storage_buffer.as_entire_binding(),
-            }],
-        });
-
-        let
     }
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
@@ -319,56 +182,6 @@ impl State {
             0,
             bytemuck::cast_slice(&[self.camera_uniform]),
         );
-        self.queue.write_buffer(
-            &self.audio_in_buffer,
-            0,
-            &(AUDIO_IN).to_ne_bytes(),
-        );
-    }
-
-    fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        let output = self.surface.get_current_texture()?;
-        let view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Render Encoder"),
-            });
-
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: BACKGROUND_COLOR[0],
-                            g: BACKGROUND_COLOR[1],
-                            b: BACKGROUND_COLOR[2],
-                            a: BACKGROUND_COLOR[3],
-                        }),
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
-            });
-
-            render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
-            render_pass.set_bind_group(1, &self.audio_in_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
-        }
-
-        self.queue.submit(iter::once(encoder.finish()));
-        output.present();
-
-        Ok(())
     }
 }
 
@@ -419,23 +232,9 @@ pub async fn run() {
 
     // State::new uses async code, so we're going to wait for it to finish
     let mut state = State::new(&window).await;
+    let mut renderer = Renderer::new();
 
-    let mesh = avatar::gen_fibonacci_mesh();
-
-    let vertex_buffer = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Vertex Buffer"),
-        contents: bytemuck::cast_slice(&mesh.vertices[..]),
-        usage: wgpu::BufferUsages::VERTEX,
-    });
-    let index_buffer = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Index Buffer"),
-        contents: bytemuck::cast_slice(&mesh.indices[..]),
-        usage: wgpu::BufferUsages::INDEX,
-    });
-
-    state.vertex_buffer = vertex_buffer;
-    state.index_buffer = index_buffer;
-    state.num_indices = mesh.indices.len() as u32;
+    renderer.add_render_batch(Box::new(avatar::Avatar::build_avatar(&state)));
 
     event_loop.run(move |event, _, control_flow| {
         match event {
@@ -461,7 +260,8 @@ pub async fn run() {
             }
             Event::RedrawRequested(window_id) if window_id == window.id() => unsafe {
                 state.update();
-                match state.render() {
+                renderer.update_buffers(&mut state.queue);
+                match renderer.render(&state) {
                     Ok(_) => {}
                     // Reconfigure the surface if it's lost or outdated
                     Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => state.resize(state.size),
