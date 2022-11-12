@@ -1,7 +1,3 @@
-use std::borrow::Cow;
-use std::iter;
-use image::io::Reader;
-use image::RgbImage;
 use wgpu::BindGroupLayout;
 
 use wgpu::util::DeviceExt;
@@ -10,9 +6,9 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
 };
-use winit::dpi::{LogicalSize, PhysicalSize};
-use winit::platform::windows::{IconExtWindows, WindowBuilderExtWindows};
-use winit::window::{BadIcon, Icon};
+use winit::dpi::{LogicalSize};
+use winit::platform::windows::{WindowBuilderExtWindows};
+use winit::window::{Icon};
 
 mod avatar;
 mod model;
@@ -21,17 +17,21 @@ mod renderer;
 
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
-use crate::AUDIO_IN;
-use crate::graphics::avatar::Avatar;
 use crate::graphics::camera::{Camera, CameraController, CameraUniform};
-use crate::graphics::model::Vertex;
 use crate::graphics::renderer::Renderer;
 
 
 const BACKGROUND_COLOR: [f64; 4] = [0.0,0.0,0.0,0.0];
 
-#[rustfmt::skip]
+struct DefaultBindGroup {
+    camera_buffer: wgpu::Buffer,
+    time_buffer: wgpu::Buffer,
 
+    default_bind_group_layout: BindGroupLayout,
+    default_bindings: wgpu::BindGroup,
+}
+
+#[rustfmt::skip]
 struct State {
     surface: wgpu::Surface,
     device: wgpu::Device,
@@ -41,15 +41,18 @@ struct State {
 
     // Camera stuff
     camera: Camera,
-    camera_bind_group_layout: BindGroupLayout,
     camera_controller: CameraController,
     camera_uniform: CameraUniform,
-    camera_buffer: wgpu::Buffer,
-    camera_bind_group: wgpu::BindGroup,
+
+    // time
+    time: f32,
+
+    default_bind_group: DefaultBindGroup,
 }
 
 impl State {
     async fn new(window: &Window) -> Self {
+
         let size = window.inner_size();
 
         // The instance is a handle to our GPU
@@ -104,6 +107,11 @@ impl State {
         };
         let camera_controller = CameraController::new(0.2);
 
+
+        // #########################################################
+        // ################ Default Uniforms #######################
+
+        // Camera uniform
         let mut camera_uniform = CameraUniform::new();
         camera_uniform.update_view_proj(&camera);
 
@@ -113,7 +121,15 @@ impl State {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let camera_bind_group_layout =
+        // Time uniform
+        let time_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Time Buffer"),
+            contents: &[0,0,0,0],
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        // Creating the bind group layout
+        let default_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[wgpu::BindGroupLayoutEntry {
                     binding: 0,
@@ -124,18 +140,38 @@ impl State {
                         min_binding_size: None,
                     },
                     count: None,
-                }],
+                },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    }],
                 label: Some("camera_bind_group_layout"),
             });
 
-        let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &camera_bind_group_layout,
+        let default_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &default_bind_group_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
                 resource: camera_buffer.as_entire_binding(),
+            }, wgpu::BindGroupEntry {
+                binding: 1,
+                resource: time_buffer.as_entire_binding(),
             }],
-            label: Some("camera_bind_group"),
+            label: Some("default_bind_group"),
         });
+
+        let default_bind_group_struct = DefaultBindGroup {
+            camera_buffer,
+            default_bindings: default_bind_group,
+            time_buffer,
+            default_bind_group_layout,
+        };
 
         Self {
             surface,
@@ -146,11 +182,11 @@ impl State {
 
 
             camera,
-            camera_bind_group_layout,
             camera_controller,
-            camera_buffer,
-            camera_bind_group,
             camera_uniform,
+
+            time: 0.0,
+            default_bind_group: default_bind_group_struct,
         }
     }
 
@@ -170,17 +206,20 @@ impl State {
     }
 
     unsafe fn update(&mut self) {
+        // Update time
+        self.time += 0.05;
+
         self.camera_controller.update_camera(&mut self.camera);
         self.camera_uniform.update_view_proj(&self.camera);
         self.queue.write_buffer(
-            &self.camera_buffer,
+            &self.default_bind_group.camera_buffer,
             0,
             bytemuck::cast_slice(&[self.camera_uniform]),
         );
         self.queue.write_buffer(
-            &self.camera_buffer,
+            &self.default_bind_group.time_buffer,
             0,
-            bytemuck::cast_slice(&[self.camera_uniform]),
+            &self.time.to_ne_bytes(),
         );
     }
 }
@@ -235,6 +274,7 @@ pub async fn run() {
     let mut renderer = Renderer::new();
 
     renderer.add_render_batch(Box::new(avatar::Avatar::build_avatar(&state)));
+    renderer.add_render_batch(Box::new(avatar::AvatarOuter::build_avatar_outer(&state)));
 
     event_loop.run(move |event, _, control_flow| {
         match event {
@@ -325,7 +365,7 @@ fn window_events(window: &mut Window, event: &WindowEvent) {
             },
             ..
         } => {
-            let is_pressed = *state == ElementState::Pressed;
+            // let is_pressed = *state == ElementState::Pressed;
             match keycode {
                 VirtualKeyCode::LControl => {
 

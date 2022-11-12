@@ -8,8 +8,6 @@ mod texture;
 use clap::Parser;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::Stream;
-use image::{DynamicImage, ImageResult, RgbImage};
-use image::io::Reader;
 
 
 #[derive(Parser, Debug)]

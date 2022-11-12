@@ -1,8 +1,5 @@
-use std::iter;
-use clap::parser::Indices;
-use wgpu::{BindGroup, Buffer, Device, DynamicOffset, Queue, RenderPass, RenderPipeline, ShaderModule, Surface};
-use wgpu::util::RenderEncoder;
-use crate::graphics::model::{Mesh, Vertex};
+use wgpu::{BindGroup, Buffer, Queue, RenderPipeline};
+use crate::graphics::model::{Vertex};
 use crate::graphics::State;
 
 pub(crate) struct Renderer {
@@ -17,7 +14,7 @@ pub(crate) trait RenderBatch {
     fn get_vertices(&self) -> &[Vertex];
     fn get_indices(&self) -> &[u16];
     fn get_indices_count(&self) -> u32;
-    fn write_buffer(&self, _: &mut Queue);
+    fn write_buffer(&mut self, _: &mut Queue);
 }
 
 const BACKGROUND_COLOR: [f64; 4] = [0.0,0.0,0.0,0.0];
@@ -35,7 +32,7 @@ impl Renderer {
     }
 
     pub fn update_buffers(&mut self, queue: &mut Queue) {
-        for render_batch in self.render_batches.iter() {
+        for render_batch in self.render_batches.iter_mut() {
             render_batch.write_buffer(queue);
         }
     }
@@ -74,13 +71,13 @@ impl Renderer {
 
             // Draw all of the render batches in the renderer
             for render_batch in self.render_batches.iter() {
-                let pipeline = render_batch.get_pipeline();
+                let pipeline = render_batch.get_pipeline().unwrap();
                 let vertex_buffer = render_batch.get_vertex_buffer();
                 let index_buffer = render_batch.get_index_buffer();
 
                 // Pass in all of the bind groups
-                render_pass.set_pipeline(render_batch.get_pipeline().unwrap());
-                render_batch.bind_group(&mut render_pass, &state.camera_bind_group);
+                render_pass.set_pipeline(pipeline);
+                render_batch.bind_group(&mut render_pass, &state.default_bind_group.default_bindings);
                 render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
                 render_pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
                 render_pass.draw_indexed(0..render_batch.get_indices_count(), 0, 0..1);
