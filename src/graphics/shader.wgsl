@@ -30,12 +30,12 @@ fn vs_main(
     var out: VertexOutput;
     out.color = model.color;
     out.clip_position = camera.view_proj * vec4<f32>(model.position.xyz, 1.0); // 2.
+    out.index = model.index;
     return out;
 }
 
 // Fragment shader
-
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return vec4<f32>(in.color * abs(sin(time)), 0.0);
+    return vec4<f32>(sin(time + in.index + 3.0)/2.0 + 0.5, cos(1.5*time + in.index)/2.0 + 0.5, sin(sin(time + in.index + 1.0)*3.14)/2.0 + 0.5, 0.0);
 }

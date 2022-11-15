@@ -2,8 +2,14 @@ struct Indices {
     indices: array<u16>,
 }
 
-@binding(0) @group(0) var<storage, read> points: array<vec3<f32>>;
-@binding(1) @group(0) var<storage, read_write> output: Indices;
+struct Particle {
+    pos: vec3<f32>,
+    velocity: vec4<f32>,
+}
+
+@binding(0) @group(0) var<storage, read> particles: array<Particle>;
+@binding(1) @group(0) var<storage, read_write> particles_write: array<Particle>;
+@binding(1) @group(0) var<storage, read_write> indices: Indices;
 
 const CONNECTIONS_PER_POINT = 3;
 
@@ -24,8 +30,8 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
         var pos = points[i];
 
         if(distance(pos, Vpos) < 0.2) {
-            output[CONNECTIONS_PER_POINT * 2 * index + connections * 2] = index;
-            output[CONNECTIONS_PER_POINT * 2 * index + connections * 2 + 1] = index;
+            indices.indices[CONNECTIONS_PER_POINT * 2 * index + connections * 2] = index;
+            indices.indices[CONNECTIONS_PER_POINT * 2 * index + connections * 2 + 1] = index;
         }
     }
 

@@ -318,6 +318,8 @@ impl RenderBatch for Avatar {
     }
 }
 
+// #######################################
+// ####### Mesh generation ###############
 pub fn gen_outer_mesh() -> Mesh {
     let samples = 50;
 

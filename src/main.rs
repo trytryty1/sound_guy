@@ -3,12 +3,40 @@
 extern crate core;
 
 mod graphics;
-mod texture;
 
+use std::fs;
+use std::fs::File;
 use clap::Parser;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::Stream;
+use serde::Deserialize;
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct Settings {
+    audio_defuse: f32,
+    transparent_background: bool,
+    background_color: Vec<f32>,
+    resizable: bool,
+    default_width: i32,
+    default_height: i32,
+}
+
+impl Settings {
+    fn load_settings() -> Settings {
+        // Load file as string
+        let mut file = match fs::read_to_string("settings.json") {
+            Ok(t) => {t}
+            Err(_) => {panic!("Could not load settings from settings.json")}
+        };
+
+        println!("Settings: {}", file);
+
+        // Load file as json
+        let json : Settings = serde_json::from_str(&file).expect("JSON was not well-formatted");
+        return json;
+    }
+}
 
 #[derive(Parser, Debug)]
 #[command(version, about = "CPAL feedback example", long_about = None)]
@@ -41,6 +69,11 @@ pub static mut AUDIO_IN: f32 = 0.0;
 const AUDIO_DIFFUSE: f32 = 0.00005;
 
 fn main() {
+    let settings = Settings::load_settings();
+    println!("{:?}", settings);
+
+    // TODO: use settings during initialization
+
     // Setup the audio stream
     let stream = setup_feedback();
 

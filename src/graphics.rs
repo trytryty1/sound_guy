@@ -107,14 +107,14 @@ impl State {
         };
         let camera_controller = CameraController::new(0.2);
 
+        let mut camera_uniform = CameraUniform::new();
+        camera_uniform.update_view_proj(&camera);
+
 
         // #########################################################
         // ################ Default Uniforms #######################
 
         // Camera uniform
-        let mut camera_uniform = CameraUniform::new();
-        camera_uniform.update_view_proj(&camera);
-
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Camera Buffer"),
             contents: bytemuck::cast_slice(&[camera_uniform]),
