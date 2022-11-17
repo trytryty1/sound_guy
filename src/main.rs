@@ -13,13 +13,15 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-struct Settings {
+pub struct Settings {
     audio_defuse: f32,
     transparent_background: bool,
     background_color: Vec<f32>,
     resizable: bool,
     default_width: i32,
     default_height: i32,
+    always_on_top: bool,
+    title: String,
 }
 
 impl Settings {
@@ -66,7 +68,6 @@ struct Opt {
 
 // Float that stores the loudest audio input detected over the las few milliseconds
 pub static mut AUDIO_IN: f32 = 0.0;
-const AUDIO_DIFFUSE: f32 = 0.00005;
 
 fn main() {
     let settings = Settings::load_settings();
@@ -75,17 +76,17 @@ fn main() {
     // TODO: use settings during initialization
 
     // Setup the audio stream
-    let stream = setup_feedback();
+    let stream = setup_feedback(&settings);
 
     // Setup the window and graphics
-    pollster::block_on(graphics::run());
+    pollster::block_on(graphics::run(&settings));
 
     // Destroy the audio steam
     drop(stream);
 }
 
 // Consumes the thread until done with feedback
-fn setup_feedback() -> Stream {
+fn setup_feedback(settings: &Settings) -> Stream {
     let opt = Opt::parse();
 
     // Conditionally compile with jack if the feature is specified.
@@ -137,13 +138,15 @@ fn setup_feedback() -> Stream {
         Err(_) => panic!("Config is brok")
     };
 
+    let audio_defuse = settings.audio_defuse;
+
     // Call back for when the audio input device get audio
     let input_data_fn = move |data: &[f32], _: &cpal::InputCallbackInfo| unsafe {
         for &sample in data {
 
             // Increases AUDIO_IN if the input is louder and decrease it gradually
             //let var = if sample < 0.1 {0.0} else {}
-            AUDIO_IN = f32::max(AUDIO_IN, if sample < 0.03 {0.0} else {f32::sqrt(sample*2.0)}) - AUDIO_IN * AUDIO_DIFFUSE;
+            AUDIO_IN = f32::max(AUDIO_IN, if sample < 0.03 {0.0} else {f32::sqrt(sample*2.0)}) - AUDIO_IN * audio_defuse;
         }
     };
 

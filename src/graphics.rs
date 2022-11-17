@@ -14,11 +14,14 @@ mod avatar;
 mod model;
 mod camera;
 mod renderer;
+mod texture;
 
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
 use crate::graphics::camera::{Camera, CameraController, CameraUniform};
 use crate::graphics::renderer::Renderer;
+use crate::graphics::texture::Texture;
+use crate::{graphics, Settings};
 
 
 const BACKGROUND_COLOR: [f64; 4] = [0.0,0.0,0.0,0.0];
@@ -48,12 +51,14 @@ struct State {
     time: f32,
 
     default_bind_group: DefaultBindGroup,
+    depth_texture: graphics::texture::Texture,
 }
 
 impl State {
     async fn new(window: &Window) -> Self {
 
         let size = window.inner_size();
+
 
         // The instance is a handle to our GPU
         // BackendBit::PRIMARY => Vulkan + Metal + DX12 + Browser WebGPU
@@ -95,6 +100,8 @@ impl State {
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
         };
         surface.configure(&device, &config);
+
+        let depth_texture = texture::Texture::create_depth_texture(&device, &config, "depth_texture");
 
         let camera = Camera {
             eye: (0.0, 1.0, 2.0).into(),
@@ -187,6 +194,8 @@ impl State {
 
             time: 0.0,
             default_bind_group: default_bind_group_struct,
+
+            depth_texture,
         }
     }
 
@@ -225,7 +234,7 @@ impl State {
 }
 
 #[cfg_attr(target_arch="wasm32", wasm_bindgen(start))]
-pub async fn run() {
+pub async fn run(settings: &Settings) {
     cfg_if::cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
             std::panic::set_hook(Box::new(console_error_panic_hook::hook));
@@ -239,10 +248,10 @@ pub async fn run() {
 
     let mut window = WindowBuilder::new()
         .with_decorations(false)
-        .with_transparent(true)
-        .with_always_on_top(true)
-        .with_inner_size(LogicalSize::new(400.0,400.0))
-        .with_title("sound_guy")
+        .with_transparent(settings.transparent_background)
+        .with_always_on_top(settings.always_on_top)
+        .with_inner_size(LogicalSize::new(settings.default_width as f32, settings.default_height as f32))
+        .with_title(&settings.title)
         .with_taskbar_icon(Some(load_icon()))
         .with_window_icon(Some(load_icon()))
         .build(&event_loop)

@@ -15,10 +15,13 @@ pub(crate) trait RenderBatch {
     fn get_indices(&self) -> &[u16];
     fn get_indices_count(&self) -> u32;
     fn write_buffer(&mut self, _: &mut Queue);
+    fn get_instance_buffer(&self) -> Option<&Buffer>;
+    fn get_instance_count(&self) -> Option<u16>;
 }
 
 const BACKGROUND_COLOR: [f64; 4] = [0.0,0.0,0.0,0.0];
 
+// TODO: need to update render batches when the screen gets resized
 impl Renderer {
     pub fn new() -> Self {
         let render_batches = Vec::new();
@@ -66,7 +69,14 @@ impl Renderer {
                         store: true,
                     },
                 })],
-                depth_stencil_attachment: None,
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &state.depth_texture.view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: true,
+                    }),
+                    stencil_ops: None,
+                }),
             });
 
             // Draw all of the render batches in the renderer
@@ -79,8 +89,17 @@ impl Renderer {
                 render_pass.set_pipeline(pipeline);
                 render_batch.bind_group(&mut render_pass, &state.default_bind_group.default_bindings);
                 render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+                match render_batch.get_instance_buffer() {
+                    None => {}
+                    Some(buffer) => {
+                        render_pass.set_vertex_buffer(1, buffer.slice(..));
+                    }
+                }
                 render_pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-                render_pass.draw_indexed(0..render_batch.get_indices_count(), 0, 0..1);
+                render_pass.draw_indexed(0..render_batch.get_indices_count(), 0, 0..match render_batch.get_instance_count() {
+                    None => {1}
+                    Some(t) => {t as u32}
+                });
             }
         }
         // Output to the screen

@@ -1,9 +1,12 @@
+use std::mem;
 use wgpu::{BindGroup, Buffer, Queue, RenderPass, RenderPipeline};
 use wgpu::util::DeviceExt;
 use crate::AUDIO_IN;
 use crate::graphics::model::{Mesh, Vertex};
 use crate::graphics::renderer::{RenderBatch};
-use crate::graphics::State;
+use crate::graphics::{State, texture};
+use cgmath::prelude::*;
+use cgmath::{Quaternion, Vector3};
 
 pub(crate) struct Avatar {
     mesh: Mesh,
@@ -21,10 +24,75 @@ pub(crate) struct AvatarOuter {
     index_buffer: Buffer,
     audio_bind_group: BindGroup,
     audio_in_buffer: Buffer,
+    instance_buffer: Buffer,
+    index_count: u16,
+}
+
+// TODO: move this method to a more appropriate place
+struct Instance {
+    position: cgmath::Vector3<f32>,
+    rotation: cgmath::Quaternion<f32>,
+}
+
+// TODO: move this method to a more appropriate place
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct InstanceRaw {
+    model: [[f32;4]; 4],
+}
+
+impl Instance {
+    fn to_raw(&self) -> InstanceRaw {
+        InstanceRaw {
+            model: (cgmath::Matrix4::from_translation(self.position) * cgmath::Matrix4::from(self.rotation)).into(),
+        }
+    }
+}
+
+impl InstanceRaw {
+    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
+        use std::mem;
+        wgpu::VertexBufferLayout {
+            array_stride: mem::size_of::<InstanceRaw>() as wgpu::BufferAddress,
+            // We need to switch from using a step mode of Vertex to Instance
+            // This means that our shaders will only change to use the next
+            // instance when the shader starts processing a new instance
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    // While our vertex shader only uses locations 0, and 1 now, in later tutorials we'll
+                    // be using 2, 3, and 4, for Vertex. We'll start at slot 5 not conflict with them later
+                    shader_location: 5,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                // A mat4 takes up 4 vertex slots as it is technically 4 vec4s. We need to define a slot
+                // for each vec4. We'll have to reassemble the mat4 in
+                // the shader.
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
+                    shader_location: 6,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 8]>() as wgpu::BufferAddress,
+                    shader_location: 7,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 12]>() as wgpu::BufferAddress,
+                    shader_location: 8,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+            ],
+        }
+    }
 }
 
 impl AvatarOuter {
-    pub fn build_avatar_outer(state: &State) -> Avatar {
+    pub fn build_avatar_outer(state: &State) -> AvatarOuter {
+
+        let index_count: u16 = 5000;
 
         let audio_bind_group_layout =
             state.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -56,6 +124,29 @@ impl AvatarOuter {
             label: Some("audio_in_bind_group"),
         });
 
+
+        // ############################################
+        // ############# Instancing ###################
+        let mesh = fibonacci_sphere_points(index_count.into());
+        let mut instances: Vec<Instance> = Vec::new();
+        for (x,y,z) in mesh.into_iter() {
+            instances.push(Instance {
+                position: cgmath::Vector3 {x , y, z},
+                rotation: cgmath::Quaternion::from_axis_angle(Vector3::new(0.0,0.0,0.0), cgmath::Deg(45.0))
+            });
+        }
+
+        // Create the instance buffer
+        let instance_data = instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
+        let instance_buffer = state.device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Instance Buffer"),
+                contents: bytemuck::cast_slice(&instance_data),
+                usage: wgpu::BufferUsages::VERTEX,
+            }
+        );
+
+
         let shader = state.device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shader_avatar_outer.wgsl").into()),
@@ -74,7 +165,7 @@ impl AvatarOuter {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &[Vertex::desc()],
+                buffers: &[Vertex::desc(), InstanceRaw::desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
@@ -93,7 +184,13 @@ impl AvatarOuter {
                 front_face: wgpu::FrontFace::Ccw,
                 ..Default::default()
             },
-            depth_stencil: None,
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: texture::Texture::DEPTH_FORMAT,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less, // 1.
+                stencil: wgpu::StencilState::default(), // 2.
+                bias: wgpu::DepthBiasState::default(),
+            }),
             multisample: wgpu::MultisampleState {
                 count: 1,
                 mask: !0,
@@ -117,13 +214,15 @@ impl AvatarOuter {
             usage: wgpu::BufferUsages::INDEX,
         });
 
-        Avatar {
+        AvatarOuter {
             mesh: model,
             render_pipeline,
             vertex_buffer,
             index_buffer,
             audio_bind_group,
             audio_in_buffer: audio_buffer,
+            instance_buffer,
+            index_count,
         }
     }
 }
@@ -198,7 +297,13 @@ impl Avatar {
                 front_face: wgpu::FrontFace::Ccw,
                 ..Default::default()
             },
-            depth_stencil: None,
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: texture::Texture::DEPTH_FORMAT,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less, // 1.
+                stencil: wgpu::StencilState::default(), // 2.
+                bias: wgpu::DepthBiasState::default(),
+            }),
             multisample: wgpu::MultisampleState {
                 count: 1,
                 mask: !0,
@@ -274,6 +379,14 @@ impl RenderBatch for AvatarOuter {
             );
         }
     }
+
+    fn get_instance_buffer(&self) -> Option<&Buffer> {
+        Some(&self.instance_buffer)
+    }
+
+    fn get_instance_count(&self) -> Option<u16> {
+        Some(self.index_count)
+    }
 }
 
 impl RenderBatch for Avatar {
@@ -315,6 +428,14 @@ impl RenderBatch for Avatar {
                 &(AUDIO_IN).to_ne_bytes(),
             );
         }
+    }
+
+    fn get_instance_buffer(&self) -> Option<&Buffer> {
+        None
+    }
+
+    fn get_instance_count(&self) -> Option<u16> {
+        None
     }
 }
 
@@ -373,6 +494,10 @@ pub fn gen_fibonacci_mesh() -> Mesh { //-> &[Vertex] {
     }
 
     Mesh::new(vertices, indices)
+}
+
+fn triangle_sphere() {
+    
 }
 
 fn fibonacci_sphere_points(samples: u32) -> Vec<(f32, f32, f32)> {
