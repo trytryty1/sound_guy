@@ -497,7 +497,7 @@ pub fn gen_fibonacci_mesh() -> Mesh { //-> &[Vertex] {
 }
 
 fn triangle_sphere() {
-    
+
 }
 
 fn fibonacci_sphere_points(samples: u32) -> Vec<(f32, f32, f32)> {
