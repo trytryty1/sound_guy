@@ -92,7 +92,7 @@ impl InstanceRaw {
 impl AvatarOuter {
     pub fn build_avatar_outer(state: &State) -> AvatarOuter {
 
-        let index_count: u16 = 5000;
+        let index_count: u16 = 1000;
 
         let audio_bind_group_layout =
             state.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -201,7 +201,7 @@ impl AvatarOuter {
             multiview: None,
         });
 
-        let model = gen_fibonacci_mesh();
+        let model = gen_triangle_mesh();
 
         let vertex_buffer = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
@@ -496,8 +496,36 @@ pub fn gen_fibonacci_mesh() -> Mesh { //-> &[Vertex] {
     Mesh::new(vertices, indices)
 }
 
-fn triangle_sphere() {
+fn gen_triangle_mesh() -> Mesh {
 
+    let mut vertices: Vec<Vertex> = Vec::new();
+    let mut indices: Vec<u16> = Vec::new();
+    let size: f32 = 0.03;
+
+    vertices.push(Vertex {
+        position: [size, size, size],
+        color: [1.0,0.0,0.0],
+        index: 0.9
+    });
+    vertices.push(Vertex {
+        position: [size, 0.00, size],
+        color: [0.0,1.0,0.0],
+        index: 0.6
+    });
+    vertices.push(Vertex {
+        position: [0.00, size, size],
+        color: [0.0,0.0,1.0],
+        index: 0.3
+    });
+
+    indices.push(0);
+    indices.push(1);
+    indices.push(2);
+
+    Mesh {
+        vertices,
+        indices,
+    }
 }
 
 fn fibonacci_sphere_points(samples: u32) -> Vec<(f32, f32, f32)> {
