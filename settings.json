@@ -1,0 +1,10 @@
+{
+	"AudioDefuse": 0.00005,
+	"TransparentBackground": true,
+	"BackgroundColor": [0.0,0.0,0.0,0.0],
+	"Resizable": true,
+	"DefaultWidth": 400,
+	"DefaultHeight": 400,
+	"AlwaysOnTop": true,
+	"Title": "Sound Guy"
+}

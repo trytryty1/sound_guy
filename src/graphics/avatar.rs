@@ -1,60 +1,58 @@
-use crate::graphics::{Mesh, Vertex};
+use wgpu::{BindGroup, Buffer, Queue, RenderPass, RenderPipeline};
+use wgpu::util::DeviceExt;
+use crate::AUDIO_IN;
+use crate::graphics::model::{Mesh, Vertex};
+use crate::graphics::renderer::{RenderBatch};
+use crate::graphics::{State, texture};
+use cgmath::prelude::*;
+use cgmath::{Vector3};
+use crate::graphics::model::*;
 
-struct Avatar {
-    radius: u32,
-    detail: u32,
+pub struct Avatar {
+    pub(crate) avatar_modules: Vec<AvatarModule>,
 }
 
-pub fn gen_fibonacci_mesh() -> Mesh { //-> &[Vertex] {
-    let samples = 250;
+pub struct AvatarModule {
+    pub(crate) module_name: String,
+    pub(crate) mesh: Mesh,
+    pub(crate) render_pipeline: RenderPipeline,
+    pub(crate) vertex_buffer: Buffer,
+    pub(crate) index_buffer: Buffer,
+    pub(crate) instance_buffer: Buffer,
+    pub(crate) index_count: u16,
+    pub(crate) instance_count: u16,
+}
 
-    let points = fibonacci_sphere_points(samples);
-
-    let mut vertices: Vec<Vertex> = Vec::new();
-    let mut indices: Vec<u16> = Vec::new();
-
-    // Add the center vertices
-    vertices.push(Vertex {position:[0.0,0.0,0.0], color:[0.0,0.0,0.0], index:0f32});
-
-    for (index, (x, y , z)) in points.into_iter().enumerate() {
-        let r:f32 = (x + 1.0)/2.0;
-        let g:f32 = (y + 1.0)/2.0;
-        let b:f32 = (z + 1.0)/2.0;
-
-        vertices.push(Vertex {position: [x, y, z],
-            color:[r,g,b],
-            index: if index % 11 == 0 {1.0} else {0.0}});
-
-        indices.push(0);
-        indices.push(index as u16);
-
+impl RenderBatch for AvatarModule {
+    fn get_pipeline(&self) -> Option<&RenderPipeline> {
+        Some(&self.render_pipeline)
     }
 
-    Mesh::new(vertices, indices)
-}
-
-fn fibonacci_sphere_points(samples: u32) -> Vec<(f32, f32, f32)> {
-
-    let mut points: Vec<(f32, f32, f32)> = Vec::new();
-    let phi = std::f32::consts::PI * (3.0 - f32::sqrt(5.0));
-
-    for i in 0..samples {
-        let y = 1.0 - (i as f32 / ((samples as f32 - 1.0) as f32)) * 2.0;
-        let radius = f32::sqrt(1.0 - y * y);
-
-        let theta = phi * i as f32;
-
-        let x = f32::cos(theta) * radius;
-        let z = f32::sin(theta) * radius;
-
-        points.push((x, y, z));
+    fn get_vertex_buffer(&self) -> &Buffer {
+        &self.vertex_buffer
     }
 
-    return points;
-}
+    fn get_index_buffer(&self) -> &Buffer {
+        &self.index_buffer
+    }
 
-impl Avatar {
+    fn get_vertices(&self) -> &[Vertex] {
+        &self.mesh.vertices[..]
+    }
 
+    fn get_indices(&self) -> &[u16] {
+        &self.mesh.indices[..]
+    }
 
+    fn get_indices_count(&self) -> u32 {
+        self.index_count as u32
+    }
 
+    fn get_instance_buffer(&self) -> Option<&Buffer> {
+        Some(&self.instance_buffer)
+    }
+
+    fn get_instance_count(&self) -> Option<u16> {
+        Some(self.instance_count as u16)
+    }
 }

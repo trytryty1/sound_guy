@@ -1,29 +1,44 @@
-//! Feeds back the input stream directly into the output stream.
-//!
-//! Assumes that the input and output devices can use the same stream configuration and that they
-//! support the f32 sample format.
-//!
-//! Uses a delay of `LATENCY_MS` milliseconds in case the default input and output streams are not
-//! precisely synchronised.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 extern crate core;
 
 mod graphics;
-mod texture;
 
+use std::fs;
+use std::fs::File;
 use clap::Parser;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use ringbuf::HeapRb;
-use core::{
-    convert::{TryFrom, TryInto},
-    mem::{size_of, size_of_val},
-};
-use std::sync::{Arc, Mutex};
-use std::{thread, time};
 use cpal::Stream;
+use serde::Deserialize;
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct Settings {
+    audio_defuse: f32,
+    transparent_background: bool,
+    background_color: Vec<f32>,
+    resizable: bool,
+    default_width: i32,
+    default_height: i32,
+    always_on_top: bool,
+    title: String,
+}
 
+impl Settings {
+    fn load_settings() -> Settings {
+        // Load file as string
+        let mut file = match fs::read_to_string("settings.json") {
+            Ok(t) => {t}
+            Err(_) => {panic!("Could not load settings from settings.json")}
+        };
+
+        println!("Settings: {}", file);
+
+        // Load file as json
+        let json : Settings = serde_json::from_str(&file).expect("JSON was not well-formatted");
+        return json;
+    }
+}
 
 #[derive(Parser, Debug)]
 #[command(version, about = "CPAL feedback example", long_about = None)]
@@ -51,20 +66,27 @@ struct Opt {
     jack: bool,
 }
 
-pub static mut audio_in: f32 = 0.0;
+// Float that stores the loudest audio input detected over the las few milliseconds
+pub static mut AUDIO_IN: f32 = 0.0;
 
 fn main() {
+    let settings = Settings::load_settings();
+    println!("{:?}", settings);
 
-    let stream = setup_feedback();
-    //graphics::run();
+    // TODO: use settings during initialization
 
-    pollster::block_on(graphics::run());
+    // Setup the audio stream
+    let stream = setup_feedback(&settings);
 
+    // Setup the window and graphics
+    pollster::block_on(graphics::run(&settings));
+
+    // Destroy the audio steam
     drop(stream);
 }
 
 // Consumes the thread until done with feedback
-fn setup_feedback() -> Stream {
+fn setup_feedback(settings: &Settings) -> Stream {
     let opt = Opt::parse();
 
     // Conditionally compile with jack if the feature is specified.
@@ -107,18 +129,24 @@ fn setup_feedback() -> Stream {
 
     println!("Using input device: \"{}\"", match input_device.name() {
         Ok(t) => t,
-        Err(e) => panic!("ERROR")
+        Err(_) => panic!("ERROR")
     });
 
     // We'll try and use the same configuration between streams to keep it simple.
     let config: cpal::StreamConfig = match input_device.default_input_config() {
         Ok(t) => t.into(),
-        Err(e) => panic!("Config is brok")
+        Err(_) => panic!("Config is brok")
     };
 
+    let audio_defuse = settings.audio_defuse;
+
+    // Call back for when the audio input device get audio
     let input_data_fn = move |data: &[f32], _: &cpal::InputCallbackInfo| unsafe {
         for &sample in data {
-            audio_in = f32::max(audio_in, f32::sqrt(sample*2.0)) - audio_in * 0.00002;
+
+            // Increases AUDIO_IN if the input is louder and decrease it gradually
+            //let var = if sample < 0.1 {0.0} else {}
+            AUDIO_IN = f32::max(AUDIO_IN, if sample < 0.03 {0.0} else {f32::sqrt(sample*2.0)}) - AUDIO_IN * audio_defuse;
         }
     };
 
@@ -129,7 +157,7 @@ fn setup_feedback() -> Stream {
     );
     let input_stream = match input_device.build_input_stream(&config, input_data_fn, err_fn) {
         Ok(t) => t,
-        Err(e) => panic!("NOOOOOO!")
+        Err(_) => panic!("NOOOOOO!")
     };
     println!("Successfully built streams.");
 
@@ -149,6 +177,6 @@ fn setup_feedback() -> Stream {
 
 
 
-fn err_fn(err: cpal::StreamError) {
-    eprintln!("an error occurred on stream: {}", err);
+fn err_fn(_: cpal::StreamError) {
+    eprintln!("an error occurred on stream: {}", "Audio input stream");
 }
