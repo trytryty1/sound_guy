@@ -15,27 +15,31 @@ mod model;
 mod camera;
 mod renderer;
 mod texture;
+mod avatar_generator;
 
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
 use crate::graphics::camera::{Camera, CameraController, CameraUniform};
 use crate::graphics::renderer::Renderer;
 use crate::graphics::texture::Texture;
-use crate::{graphics, Settings};
+use crate::{AUDIO_IN, graphics, Settings};
+use crate::graphics::avatar::{Avatar, AvatarModule};
 
 
 const BACKGROUND_COLOR: [f64; 4] = [0.0,0.0,0.0,0.0];
 
-struct DefaultBindGroup {
+struct DefaultBindGroups {
     camera_buffer: wgpu::Buffer,
     time_buffer: wgpu::Buffer,
+    audio_buffer: wgpu::Buffer,
+    keyboard_speed_buffer: wgpu::Buffer,
 
     default_bind_group_layout: BindGroupLayout,
     default_bindings: wgpu::BindGroup,
 }
 
 #[rustfmt::skip]
-struct State {
+pub struct State {
     surface: wgpu::Surface,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -50,7 +54,7 @@ struct State {
     // time
     time: f32,
 
-    default_bind_group: DefaultBindGroup,
+    default_bind_group: DefaultBindGroups,
     depth_texture: graphics::texture::Texture,
 }
 
@@ -135,10 +139,23 @@ impl State {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
+        let audio_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Audio Buffer"),
+            contents: &[0,0,0,0],
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let keyboard_speed_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Keyboard Speed Buffer"),
+            contents: &[0,0,0,0],
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
         // Creating the bind group layout
         let default_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                entries: &[wgpu::BindGroupLayoutEntry {
+                entries:
+                &[wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStages::VERTEX,
                     ty: wgpu::BindingType::Buffer {
@@ -148,16 +165,36 @@ impl State {
                     },
                     count: None,
                 },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    }],
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },],
                 label: Some("camera_bind_group_layout"),
             });
 
@@ -169,14 +206,22 @@ impl State {
             }, wgpu::BindGroupEntry {
                 binding: 1,
                 resource: time_buffer.as_entire_binding(),
-            }],
+            }, wgpu::BindGroupEntry {
+                binding: 2,
+                resource: audio_buffer.as_entire_binding(),
+            }, wgpu::BindGroupEntry {
+                binding: 3,
+                resource: keyboard_speed_buffer.as_entire_binding(),
+            },],
             label: Some("default_bind_group"),
         });
 
-        let default_bind_group_struct = DefaultBindGroup {
+        let default_bind_group_struct = DefaultBindGroups {
             camera_buffer,
             default_bindings: default_bind_group,
             time_buffer,
+            audio_buffer,
+            keyboard_speed_buffer,
             default_bind_group_layout,
         };
 
@@ -234,6 +279,11 @@ impl State {
             0,
             &self.time.to_ne_bytes(),
         );
+        self.queue.write_buffer(
+            &self.default_bind_group.audio_buffer,
+            0,
+            &AUDIO_IN.to_ne_bytes(),
+        );
     }
 }
 
@@ -286,8 +336,10 @@ pub async fn run(settings: &Settings) {
     let mut state = State::new(&window).await;
     let mut renderer = Renderer::new();
 
-    renderer.add_render_batch(Box::new(avatar::Avatar::build_avatar(&state)));
-    renderer.add_render_batch(Box::new(avatar::AvatarOuter::build_avatar_outer(&state)));
+    let avatar: crate::graphics::avatar::Avatar = avatar_generator::build_avatar(avatar_generator::load_avatar_data().unwrap(), &state);
+    for avatar_module in avatar.avatar_modules.into_iter() {
+        renderer.add_render_batch(Box::new(avatar_module));
+    }
 
     event_loop.run(move |event, _, control_flow| {
         match event {
@@ -313,7 +365,6 @@ pub async fn run(settings: &Settings) {
             }
             Event::RedrawRequested(window_id) if window_id == window.id() => unsafe {
                 state.update();
-                renderer.update_buffers(&mut state.queue);
                 match renderer.render(&state) {
                     Ok(_) => {}
                     // Reconfigure the surface if it's lost or outdated
@@ -353,7 +404,7 @@ fn device_events(window: &mut Window, event: &DeviceEvent) {
         DeviceEvent::Key(input) => {
             let is_pressed = input.state == ElementState::Pressed;
             match input.virtual_keycode.unwrap() {
-                VirtualKeyCode::RControl => unsafe {
+                VirtualKeyCode::RShift => unsafe {
                     if is_pressed {
                         window.set_cursor_hittest(TAKE_FOCUS).expect("TODO: panic message");
                         window.set_decorations(TAKE_FOCUS);
@@ -380,7 +431,7 @@ fn window_events(window: &mut Window, event: &WindowEvent) {
         } => {
             // let is_pressed = *state == ElementState::Pressed;
             match keycode {
-                VirtualKeyCode::LControl => {
+                VirtualKeyCode::LShift => {
 
                 }
 

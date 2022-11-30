@@ -1,4 +1,5 @@
 use wgpu::{BindGroup, Buffer, Queue, RenderPipeline};
+use crate::graphics::avatar::AvatarModule;
 use crate::graphics::model::{Vertex};
 use crate::graphics::State;
 
@@ -8,13 +9,11 @@ pub(crate) struct Renderer {
 
 pub(crate) trait RenderBatch {
     fn get_pipeline(&self) -> Option<&RenderPipeline>;
-    fn bind_group<'a, 'b>(&'a self, _: &'b mut wgpu::RenderPass<'a>, _: &'a BindGroup) where 'a: 'b;
     fn get_vertex_buffer(&self) -> &Buffer;
     fn get_index_buffer(&self) -> &Buffer;
     fn get_vertices(&self) -> &[Vertex];
     fn get_indices(&self) -> &[u16];
     fn get_indices_count(&self) -> u32;
-    fn write_buffer(&mut self, _: &mut Queue);
     fn get_instance_buffer(&self) -> Option<&Buffer>;
     fn get_instance_count(&self) -> Option<u16>;
 }
@@ -30,14 +29,8 @@ impl Renderer {
         }
     }
 
-    pub fn add_render_batch(&mut self, render_batch: Box<dyn RenderBatch>) {
+    pub fn add_render_batch(&mut self, render_batch: Box<AvatarModule>) {
         self.render_batches.push(render_batch);
-    }
-
-    pub fn update_buffers(&mut self, queue: &mut Queue) {
-        for render_batch in self.render_batches.iter_mut() {
-            render_batch.write_buffer(queue);
-        }
     }
 
     pub fn render(&mut self, state: &State) -> Result<(), wgpu::SurfaceError> {
@@ -87,7 +80,7 @@ impl Renderer {
 
                 // Pass in all of the bind groups
                 render_pass.set_pipeline(pipeline);
-                render_batch.bind_group(&mut render_pass, &state.default_bind_group.default_bindings);
+                render_pass.set_bind_group(0, &state.default_bind_group.default_bindings, &[]);
                 render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
                 match render_batch.get_instance_buffer() {
                     None => {}

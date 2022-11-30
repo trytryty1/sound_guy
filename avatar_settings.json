@@ -1,6 +1,50 @@
 {
-  "Name": "Sound Guy",
-  "Active": true,
-  "Radius": 1.0,
-  "Test": true
+  "AvatarModuleData": [
+  {
+    "ModuleName": "InnerShell",
+    "ShaderData": {
+      "ShaderUniform": [
+        "Default",
+        "Audio"
+      ],
+      "SourceFile": "shader.wgsl"
+    },
+    "MeshGeneration": {
+      "MeshGenFunction": {"MeshGenFunction": "Fibonacci"},
+      "MeshRenderType": {"MeshRenderType": "Lines"},
+      "Sample": 150,
+      "MeshColorFunction": {"MeshColorFunction": "Rainbow"},
+      "Size": 1.0
+    },
+    "Instancing": {
+      "Count": 1,
+      "PositionX": 0.0,
+      "PositionY": 0.0,
+      "InstanceRotationFunction": {"InstanceRotationFunction": "Default"}
+    }
+  },
+  {
+    "ModuleName": "OuterShell",
+    "ShaderData": {
+      "ShaderUniform": [
+        "Default",
+        "Audio"
+      ],
+      "SourceFile": "shader.wgsl"
+    },
+    "MeshGeneration": {
+      "MeshGenFunction": {"MeshGenFunction": "Fibonacci"},
+      "MeshRenderType": {"MeshRenderType": "Triangles"},
+      "Sample": 150,
+      "MeshColorFunction": {"MeshColorFunction": "White"},
+      "Size": 1.0
+    },
+    "Instancing": {
+      "Count": 1,
+      "PositionX": 0.0,
+      "PositionY": 0.0,
+      "InstanceRotationFunction": {"InstanceRotationFunction": "Default"}
+    }
+  }
+  ]
 }

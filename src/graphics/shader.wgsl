@@ -3,12 +3,12 @@
 struct CameraUniform {
     view_proj: mat4x4<f32>,
 };
+
 @group(0) @binding(0) // 1.
 var<uniform> camera: CameraUniform;
 @group(0) @binding(1)
 var<uniform> time: f32;
-
-@group(1) @binding(0)
+@group(0) @binding(2)
 var<uniform> audio_in: f32;
 
 struct VertexInput {
@@ -28,8 +28,8 @@ fn vs_main(
     model: VertexInput,
 ) -> VertexOutput {
     var out: VertexOutput;
-    out.color = model.color;
-    out.clip_position = camera.view_proj * vec4<f32>(model.position.xyz, 1.0); // 2.
+    out.color = model.color.xyz;
+    out.clip_position = camera.view_proj * vec4<f32>(model.position.xyz * (0.5 + audio_in) / 2.0, 1.0); // 2.
     out.index = model.index;
     return out;
 }

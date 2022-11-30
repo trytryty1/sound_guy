@@ -4,10 +4,10 @@ struct Indices {
 
 struct Particle {
     pos: vec3<f32>,
-    velocity: vec4<f32>,
+    velocity: vec3<f32>,
 }
 
-@binding(0) @group(0) var<storage, read> particles: array<Particle>;
+@binding(0) @group(0) var<storage, read> particles_read: array<Particle>;
 @binding(1) @group(0) var<storage, read_write> particles_write: array<Particle>;
 @binding(1) @group(0) var<storage, read_write> indices: Indices;
 
@@ -19,10 +19,13 @@ const CONNECTIONS_PER_POINT = 3;
 fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
     var index = GlobalInvocationID.x;
 
-    var Vpos = points[index];
+    var Vpos = particles_read[index];
     var connections = 0;
 
-    for (var i = 0u; i < arrayLength(&points) && connections < 3; i++) {
+    // update position
+    particles_write[index].position = Vpos.position + Vpos.velocity;
+
+    for (var i = 0u; i < arrayLength(&points) && connections < 3; i++) {//
         if (i == index) {
             continue;
         }
