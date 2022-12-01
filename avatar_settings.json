@@ -2,10 +2,10 @@
   "AvatarModuleData": [
   {
     "ModuleName": "InnerShell",
+    "Visible": false,
     "ShaderData": {
       "ShaderUniform": [
-        "Default",
-        "Audio"
+        "Default"
       ],
       "SourceFile": "shader.wgsl"
     },
@@ -13,7 +13,7 @@
       "MeshGenFunction": {"MeshGenFunction": "Fibonacci"},
       "MeshRenderType": {"MeshRenderType": "Lines"},
       "Sample": 150,
-      "MeshColorFunction": {"MeshColorFunction": "Rainbow"},
+      "MeshColorFunction": {"MeshColorFunction": "Black"},
       "Size": 1.0
     },
     "Instancing": {
@@ -25,10 +25,10 @@
   },
   {
     "ModuleName": "OuterShell",
+    "Visible": true,
     "ShaderData": {
       "ShaderUniform": [
-        "Default",
-        "Audio"
+        "Default"
       ],
       "SourceFile": "shader.wgsl"
     },
@@ -36,7 +36,7 @@
       "MeshGenFunction": {"MeshGenFunction": "Fibonacci"},
       "MeshRenderType": {"MeshRenderType": "Triangles"},
       "Sample": 150,
-      "MeshColorFunction": {"MeshColorFunction": "White"},
+      "MeshColorFunction": {"MeshColorFunction": "Rainbow"},
       "Size": 1.0
     },
     "Instancing": {

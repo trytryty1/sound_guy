@@ -14,6 +14,7 @@ pub struct Avatar {
 
 pub struct AvatarModule {
     pub(crate) module_name: String,
+    pub(crate) visible: bool,
     pub(crate) mesh: Mesh,
     pub(crate) render_pipeline: RenderPipeline,
     pub(crate) vertex_buffer: Buffer,
@@ -26,6 +27,10 @@ pub struct AvatarModule {
 impl RenderBatch for AvatarModule {
     fn get_pipeline(&self) -> Option<&RenderPipeline> {
         Some(&self.render_pipeline)
+    }
+
+    fn get_visible(&self) -> bool {
+        self.visible
     }
 
     fn get_vertex_buffer(&self) -> &Buffer {

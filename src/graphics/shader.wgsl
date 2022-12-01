@@ -37,5 +37,5 @@ fn vs_main(
 // Fragment shader
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return vec4<f32>(sin(time + in.index + 3.0)/2.0 + 0.5, cos(1.5*time + in.index)/2.0 + 0.5, sin(sin(time + in.index + 1.0)*3.14)/2.0 + 0.5, 0.0);
+    return vec4<f32>(in.color, 0.0);
 }

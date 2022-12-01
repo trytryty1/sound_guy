@@ -16,6 +16,7 @@ pub(crate) trait RenderBatch {
     fn get_indices_count(&self) -> u32;
     fn get_instance_buffer(&self) -> Option<&Buffer>;
     fn get_instance_count(&self) -> Option<u16>;
+    fn get_visible(&self) -> bool;
 }
 
 const BACKGROUND_COLOR: [f64; 4] = [0.0,0.0,0.0,0.0];
@@ -74,6 +75,10 @@ impl Renderer {
 
             // Draw all of the render batches in the renderer
             for render_batch in self.render_batches.iter() {
+                // Skip the rendering if the current render batch is not visible
+                if !render_batch.get_visible() {
+                    continue;
+                }
                 let pipeline = render_batch.get_pipeline().unwrap();
                 let vertex_buffer = render_batch.get_vertex_buffer();
                 let index_buffer = render_batch.get_index_buffer();

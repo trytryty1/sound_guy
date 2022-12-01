@@ -1,5 +1,6 @@
 use std::fs;
 use cgmath::{Quaternion, Rotation3, Vector3};
+use cgmath::num_traits::FloatConst;
 use crate::graphics::model::{InstanceRaw, Mesh, Vertex};
 use serde::*;
 use wgpu::PrimitiveTopology;
@@ -19,6 +20,7 @@ pub struct AvatarData {
 #[serde(rename_all = "PascalCase")]
 pub struct AvatarModuleData {
     module_name: String,
+    visible: bool,
     shader_data: ShaderData,
     mesh_generation: MeshData,
     instancing: InstanceData,
@@ -194,6 +196,7 @@ pub fn build_avatar(avatar_data: AvatarData, state: &graphics::State) -> Avatar 
         
         avatar_modules.push(AvatarModule {
             module_name: avatar_module_data.module_name,
+            visible: avatar_module_data.visible,
             render_pipeline,
             vertex_buffer,
             index_buffer,
@@ -262,11 +265,18 @@ fn color_mesh(color_function: MeshColorFunction, mesh: &mut Mesh) {
 fn color_mesh_rainbow(mesh: &mut Mesh) {
     let vertex_count = mesh.vertices.len();
     for (index, mut vertex) in mesh.vertices.clone().into_iter().enumerate() {
-        mesh.vertices[index].color = [f32::sin(index as f32),f32::cos(index as f32),f32::sin((1.0 - index as f32 / vertex_count as f32) as f32)];
+        let index_as_float = index as f32/ vertex_count as f32;
+        let r = (vertex.position[0] + 1.0) / 2.0;
+        let g = (vertex.position[1] + 1.0) / 2.0;
+        let b = (vertex.position[2] + 1.0) / 2.0;
+        mesh.vertices[index].color = [r, g, b];
     }
+    // Set the center color to black
+    mesh.vertices[0].color = [1.0,0.0,1.0];
 }
 
 fn color_mesh_solid_color(mesh: &mut Mesh, color: [f32; 3]) {
+    println!("Coloring mesh white!");
     for (index, mut vertex) in mesh.vertices.clone().into_iter().enumerate() {
         mesh.vertices[index].color = color.clone();
     }
