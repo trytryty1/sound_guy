@@ -61,7 +61,7 @@ pub enum ShaderUniforms {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "MeshGenFunction")]
 pub enum MeshGenFunction {
-    Fibonacci,
+    Fibonacci, Cube,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -107,7 +107,8 @@ pub fn build_avatar(avatar_data: AvatarData, state: &graphics::State) -> Avatar 
 
         // Create mesh
         let mut mesh = match mesh_data.mesh_gen_function.unwrap_or(MeshGenFunction::Fibonacci) {
-            MeshGenFunction::Fibonacci => {gen_fibonacci_mesh()}
+            MeshGenFunction::Fibonacci => {gen_fibonacci_mesh(mesh_data.sample.unwrap_or(25) as u32)},
+            MeshGenFunction::Cube => {gen_cube_mesh()}
         };
         color_mesh(mesh_data.mesh_color_function.unwrap_or(MeshColorFunction::Rainbow), &mut mesh);
 
@@ -312,8 +313,7 @@ pub fn gen_outer_mesh() -> Mesh {
 }
 
 
-pub fn gen_fibonacci_mesh() -> Mesh { //-> &[Vertex] {
-    let samples = 1100;
+pub fn gen_fibonacci_mesh(samples: u32) -> Mesh {
 
     let points = fibonacci_sphere_points(samples);
 
@@ -338,6 +338,66 @@ pub fn gen_fibonacci_mesh() -> Mesh { //-> &[Vertex] {
     }
 
     Mesh::new(vertices, indices)
+}
+
+fn gen_cube_mesh() -> Mesh {
+    let indice_list = [
+        //Top
+        2, 6, 7,
+        2, 3, 7,
+
+        //Bottom
+        0, 4, 5,
+        0, 1, 5,
+
+        //Left
+        0, 2, 6,
+        0, 4, 6,
+
+        //Right
+        1, 3, 7,
+        1, 5, 7,
+
+        //Front
+        0, 2, 3,
+        0, 1, 3,
+
+        //Back
+        4, 6, 7,
+        4, 5, 7
+    ];
+
+    let vertice_position_list = [
+        (-1, -1,  1), //0
+        (1, -1,  1), //1
+        (-1,  1,  1), //2
+        (1,  1,  1), //3
+        (-1, -1, -1), //4
+        (1, -1, -1), //5
+        (-1,  1, -1), //6
+        (1,  1, -1),  //7
+    ];
+
+    let mut vertices: Vec<Vertex> = Vec::new();
+    let mut indices: Vec<u16> = Vec::new();
+
+    for index in indice_list {
+        indices.push(index);
+    }
+
+    for (index, (x, y, z)) in vertice_position_list.into_iter().enumerate() {
+        vertices.push(Vertex {
+            position: [x as f32, y as f32, z as f32],
+            color: [(x as f32 + 1.0) / 2.0, (y as f32 + 1.0) / 2.0, (z as f32 + 1.0) / 2.0],
+            index: index as f32 / vertice_position_list.len() as f32,
+        })
+    }
+
+    return Mesh {
+        vertices,
+        indices,
+    }
+
 }
 
 fn gen_triangle_mesh() -> Mesh {

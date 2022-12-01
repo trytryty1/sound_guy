@@ -12,7 +12,7 @@
     "MeshGeneration": {
       "MeshGenFunction": {"MeshGenFunction": "Fibonacci"},
       "MeshRenderType": {"MeshRenderType": "Lines"},
-      "Sample": 150,
+      "Sample": 500,
       "MeshColorFunction": {"MeshColorFunction": "Black"},
       "Size": 1.0
     },
@@ -33,9 +33,9 @@
       "SourceFile": "shader.wgsl"
     },
     "MeshGeneration": {
-      "MeshGenFunction": {"MeshGenFunction": "Fibonacci"},
+      "MeshGenFunction": {"MeshGenFunction": "Cube"},
       "MeshRenderType": {"MeshRenderType": "Triangles"},
-      "Sample": 150,
+      "Sample": 500,
       "MeshColorFunction": {"MeshColorFunction": "Rainbow"},
       "Size": 1.0
     },
