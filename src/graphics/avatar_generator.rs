@@ -122,10 +122,17 @@ pub fn build_avatar(avatar_data: AvatarData, state: &graphics::State) -> Avatar 
             }
         );
 
+
+        // Load file source
+        let shader_source = match fs::read_to_string(shader_data.source_file.unwrap_or("shader.wgsl".to_string())) {
+            Ok(t) => {t}
+            Err(_) => {"Could not load file".to_string()}
+        };
+
         // Shader
         let shader = state.device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(shader_source.into()),
         });
 
         // Render Pipeline
