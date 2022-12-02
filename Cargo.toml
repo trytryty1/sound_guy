@@ -14,6 +14,7 @@ features = ["derive"]
 rand = "*"
 cpal = "*"
 clap = {version="*", features = ["derive"]}
+obj-rs = "*"
 ringbuf = "*"
 cgmath = "0.18.0"
 cfg-if = "1"

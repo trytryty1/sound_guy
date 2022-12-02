@@ -7,6 +7,7 @@ use wgpu::util::DeviceExt;
 use crate::graphics;
 use crate::graphics::avatar::{Avatar, AvatarModule};
 use crate::graphics::model::Instance;
+use crate::graphics::model::mesh_generation::*;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -60,7 +61,7 @@ pub enum ShaderUniforms {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "MeshGenFunction")]
 pub enum MeshGenFunction {
-    Fibonacci, Cube,
+    Fibonacci, Cube, Loaded {file: String},
 }
 
 #[derive(Serialize, Deserialize)]
@@ -101,11 +102,11 @@ pub fn build_avatar(avatar_data: AvatarData, state: &graphics::State) -> Avatar 
         let shader_data = avatar_module_data.shader_data;
         let mesh_data = avatar_module_data.mesh_generation;
         let instance_data = avatar_module_data.instancing;
-
         // Create mesh
         let mut mesh = match mesh_data.mesh_gen_function.unwrap_or(MeshGenFunction::Fibonacci) {
             MeshGenFunction::Fibonacci => {gen_fibonacci_mesh(mesh_data.sample.unwrap_or(25) as u32)},
-            MeshGenFunction::Cube => {gen_cube_mesh()}
+            MeshGenFunction::Cube => {gen_cube_mesh()},
+            MeshGenFunction::Loaded {file} => {load_mesh_from_file(file)}
         };
         color_mesh(mesh_data.mesh_color_function.unwrap_or(MeshColorFunction::Rainbow), &mut mesh);
 
@@ -295,188 +296,6 @@ fn color_mesh_solid_color(mesh: &mut Mesh, color: [f32; 3]) {
 
 // #######################################
 // ####### Mesh generation ###############
-pub fn gen_outer_mesh() -> Mesh {
-    let samples = 50;
-
-    let points = fibonacci_sphere_points(samples);
-
-    let mut vertices: Vec<Vertex> = Vec::new();
-    let mut indices: Vec<u16> = Vec::new();
-
-    for (index, (x, y , z)) in points.into_iter().enumerate() {
-        let r:f32 = (x + 1.0)/2.0;
-        let g:f32 = (y + 1.0)/2.0;
-        let b:f32 = (z + 1.0)/2.0;
-
-        vertices.push(Vertex {position: [x*1.5, y*1.5, z*1.5],
-            color:[r,g,b],
-            index: if index % 11 == 0 {1.0} else {0.0}});
-
-        indices.push(0);
-        indices.push(index as u16);
-
-    }
-
-    Mesh::new(vertices, indices)
-
-}
-
-
-pub fn gen_fibonacci_mesh(samples: u32) -> Mesh {
-
-    let points = fibonacci_sphere_points(samples);
-
-    let mut vertices: Vec<Vertex> = Vec::new();
-    let mut indices: Vec<u16> = Vec::new();
-
-    // Add the center vertices
-    vertices.push(Vertex {position:[0.0,0.0,0.0], color:[0.0,0.0,0.0], index:0f32});
-
-    for (index, (x, y , z)) in points.into_iter().enumerate() {
-        let r:f32 = (x + 1.0)/2.0;
-        let g:f32 = (y + 1.0)/2.0;
-        let b:f32 = (z + 1.0)/2.0;
-
-        vertices.push(Vertex {position: [x, y, z],
-            color:[r,g,b],
-            index: if index % 11 == 0 {1.0} else {0.0}});
-
-        indices.push(0);
-        indices.push(index as u16);
-
-    }
-
-    Mesh::new(vertices, indices)
-}
-
-fn gen_cube_mesh() -> Mesh {
-    let indice_list = [
-        //Top
-        2, 6, 7,
-        2, 3, 7,
-
-        //Bottom
-        0, 4, 5,
-        0, 1, 5,
-
-        //Left
-        0, 2, 6,
-        0, 4, 6,
-
-        //Right
-        1, 3, 7,
-        1, 5, 7,
-
-        //Front
-        0, 2, 3,
-        0, 1, 3,
-
-        //Back
-        4, 6, 7,
-        4, 5, 7
-    ];
-
-    let vertice_position_list = [
-        (-1, -1,  1), //0
-        (1, -1,  1), //1
-        (-1,  1,  1), //2
-        (1,  1,  1), //3
-        (-1, -1, -1), //4
-        (1, -1, -1), //5
-        (-1,  1, -1), //6
-        (1,  1, -1),  //7
-    ];
-
-    let mut vertices: Vec<Vertex> = Vec::new();
-    let mut indices: Vec<u16> = Vec::new();
-
-    for index in indice_list {
-        indices.push(index);
-    }
-
-    for (index, (x, y, z)) in vertice_position_list.into_iter().enumerate() {
-        vertices.push(Vertex {
-            position: [x as f32, y as f32, z as f32],
-            color: [(x as f32 + 1.0) / 2.0, (y as f32 + 1.0) / 2.0, (z as f32 + 1.0) / 2.0],
-            index: index as f32 / vertice_position_list.len() as f32,
-        })
-    }
-
-    return Mesh {
-        vertices,
-        indices,
-    }
-
-}
-
-fn gen_triangle_mesh() -> Mesh {
-
-    let mut vertices: Vec<Vertex> = Vec::new();
-    let mut indices: Vec<u16> = Vec::new();
-    let size: f32 = 0.03;
-
-    vertices.push(Vertex {
-        position: [size, size, size],
-        color: [1.0,0.0,0.0],
-        index: 0.9
-    });
-    vertices.push(Vertex {
-        position: [size, 0.00, size],
-        color: [0.0,1.0,0.0],
-        index: 0.6
-    });
-    vertices.push(Vertex {
-        position: [0.00, size, size],
-        color: [0.0,0.0,1.0],
-        index: 0.3
-    });
-    vertices.push(Vertex {
-        position: [size, size, 0.0],
-        color: [0.0,0.0,1.0],
-        index: 0.3
-    });
-    vertices.push(Vertex {
-        position: [size, 0.0, 0.0],
-        color: [0.0,0.0,1.0],
-        index: 0.3
-    });
-
-    indices.push(0);
-    indices.push(1);
-    indices.push(2);
-    indices.push(0);
-    indices.push(1);
-    indices.push(3);
-    indices.push(0);
-    indices.push(2);
-    indices.push(3);
-
-    Mesh {
-        vertices,
-        indices,
-    }
-}
-
-fn fibonacci_sphere_points(samples: u32) -> Vec<(f32, f32, f32)> {
-
-    let mut points: Vec<(f32, f32, f32)> = Vec::new();
-    let phi = std::f32::consts::PI * (3.0 - f32::sqrt(5.0));
-
-    for i in 0..samples {
-        let y = 1.0 - (i as f32 / ((samples as f32 - 1.0) as f32)) * 2.0;
-        let radius = f32::sqrt(1.0 - y * y);
-
-        let theta = phi * i as f32;
-
-        let x = f32::cos(theta) * radius;
-        let z = f32::sin(theta) * radius;
-
-        points.push((x, y, z));
-    }
-
-    return points;
-}
-
 
 #[cfg(test)]
 pub mod test {

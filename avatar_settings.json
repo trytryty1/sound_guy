@@ -33,18 +33,18 @@
       "SourceFile": "shader.wgsl"
     },
     "MeshGeneration": {
-      "MeshGenFunction": {"MeshGenFunction": "Cube"},
+      "MeshGenFunction": {"MeshGenFunction": "Loaded", "file": "monkey.obj"},
       "MeshRenderType": {"MeshRenderType": "Triangles"},
       "Sample": 500,
       "MeshColorFunction": {"MeshColorFunction": "Rainbow"},
       "Size": 1.0
     },
     "Instancing": {
-      "Count": 500,
-      "PositionX": 2.0,
+      "Count": 1,
+      "PositionX": 0.0,
       "PositionY": 0.0,
       "PositionZ": 0.0,
-      "InstanceRotationFunction": {"InstanceRotationFunction": "Sphere"}
+      "InstanceRotationFunction": {"InstanceRotationFunction": "Default"}
     }
   }
   ]
