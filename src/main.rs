@@ -5,7 +5,6 @@ extern crate core;
 mod graphics;
 
 use std::fs;
-use std::fs::File;
 use clap::Parser;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::Stream;

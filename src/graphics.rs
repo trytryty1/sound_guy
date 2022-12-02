@@ -21,9 +21,7 @@ mod avatar_generator;
 use wasm_bindgen::prelude::*;
 use crate::graphics::camera::{Camera, CameraController, CameraUniform};
 use crate::graphics::renderer::Renderer;
-use crate::graphics::texture::Texture;
 use crate::{AUDIO_IN, graphics, Settings};
-use crate::graphics::avatar::{Avatar, AvatarModule};
 
 
 const BACKGROUND_COLOR: [f64; 4] = [0.0,0.0,0.0,0.0];

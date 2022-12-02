@@ -17,10 +17,10 @@
       "Size": 1.0
     },
     "Instancing": {
-      "Count": 1,
+      "Count": 40,
       "PositionX": 0.0,
       "PositionY": 0.0,
-      "InstanceRotationFunction": {"InstanceRotationFunction": "Default"}
+      "InstanceRotationFunction": {"InstanceRotationFunction": "Sphere"}
     }
   },
   {
@@ -40,10 +40,10 @@
       "Size": 1.0
     },
     "Instancing": {
-      "Count": 1,
+      "Count": 200,
       "PositionX": 0.0,
       "PositionY": 0.0,
-      "InstanceRotationFunction": {"InstanceRotationFunction": "Default"}
+      "InstanceRotationFunction": {"InstanceRotationFunction": "Sphere"}
     }
   }
   ]

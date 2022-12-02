@@ -1,12 +1,6 @@
-use wgpu::{BindGroup, Buffer, Queue, RenderPass, RenderPipeline};
-use wgpu::util::DeviceExt;
-use crate::AUDIO_IN;
+use wgpu::{Buffer, RenderPipeline};
 use crate::graphics::model::{Mesh, Vertex};
 use crate::graphics::renderer::{RenderBatch};
-use crate::graphics::{State, texture};
-use cgmath::prelude::*;
-use cgmath::{Vector3};
-use crate::graphics::model::*;
 
 pub struct Avatar {
     pub(crate) avatar_modules: Vec<AvatarModule>,
@@ -27,10 +21,6 @@ pub struct AvatarModule {
 impl RenderBatch for AvatarModule {
     fn get_pipeline(&self) -> Option<&RenderPipeline> {
         Some(&self.render_pipeline)
-    }
-
-    fn get_visible(&self) -> bool {
-        self.visible
     }
 
     fn get_vertex_buffer(&self) -> &Buffer {
@@ -59,5 +49,9 @@ impl RenderBatch for AvatarModule {
 
     fn get_instance_count(&self) -> Option<u16> {
         Some(self.instance_count as u16)
+    }
+
+    fn get_visible(&self) -> bool {
+        self.visible
     }
 }

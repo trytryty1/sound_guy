@@ -1,12 +1,10 @@
 use std::fs;
 use cgmath::{Quaternion, Rotation3, Vector3};
-use cgmath::num_traits::FloatConst;
 use crate::graphics::model::{InstanceRaw, Mesh, Vertex};
 use serde::*;
 use wgpu::PrimitiveTopology;
 use wgpu::util::DeviceExt;
 use crate::graphics;
-use crate::graphics::{avatar, texture};
 use crate::graphics::avatar::{Avatar, AvatarModule};
 use crate::graphics::model::Instance;
 
@@ -49,7 +47,7 @@ pub struct InstanceData {
     count: Option<usize>,
     position_x: Option<f32>,
     position_y: Option<f32>,
-    rotation: Option<InstanceRotationFunction>,
+    instance_rotation_function: Option<InstanceRotationFunction>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -76,7 +74,7 @@ pub enum MeshColorFunction {
     Rainbow, Black, White,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "InstanceRotationFunction")]
 pub enum InstanceRotationFunction {
     Default, Sphere,
@@ -89,8 +87,6 @@ pub fn load_avatar_data() -> Result<AvatarData, String> {
         Ok(t) => {t}
         Err(_) => {"Could not load file".to_string()}
     };
-
-    println!("Settings: {}", file);
 
     let json : AvatarData = serde_json::from_str(&file).expect("JSON was not well-formatted");
     return Ok(json);
@@ -116,7 +112,7 @@ pub fn build_avatar(avatar_data: AvatarData, state: &graphics::State) -> Avatar 
         // Instances
         let instance_count = instance_data.count.unwrap_or(1);
         let instances = generate_instances
-            (instance_data.rotation.unwrap_or(InstanceRotationFunction::Default), instance_count);
+            (instance_data.instance_rotation_function.unwrap_or(InstanceRotationFunction::Default), instance_count);
         let instance_data = instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
         let instance_buffer = state.device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
@@ -234,12 +230,15 @@ fn generate_instances(instance_rotation_function: InstanceRotationFunction, inde
             });
         }
         InstanceRotationFunction::Sphere => {
+            let scale: f32 = 5.0;
             let points = fibonacci_sphere_points(index_count as u32);
-            let mut instances: Vec<Instance> = Vec::new();
 
             for (x,y,z) in points.into_iter() {
+                let pos_x = x * scale;
+                let pos_y = y * scale;
+                let pos_z = z * scale;
                 instances.push(Instance {
-                    position: cgmath::Vector3 {x , y, z},
+                    position: cgmath::Vector3 {x:pos_x , y:pos_y, z:pos_z},
                     rotation: cgmath::Quaternion::from_axis_angle(Vector3::new(0.0,0.0,0.0), cgmath::Deg(45.0))
                 });
             }
@@ -277,7 +276,6 @@ fn color_mesh_rainbow(mesh: &mut Mesh) {
 }
 
 fn color_mesh_solid_color(mesh: &mut Mesh, color: [f32; 3]) {
-    println!("Coloring mesh white!");
     for (index, mut vertex) in mesh.vertices.clone().into_iter().enumerate() {
         mesh.vertices[index].color = color.clone();
     }

@@ -1,4 +1,4 @@
-use wgpu::{BindGroup, Buffer, Queue, RenderPipeline};
+use wgpu::{Buffer, RenderPipeline};
 use crate::graphics::avatar::AvatarModule;
 use crate::graphics::model::{Vertex};
 use crate::graphics::State;
@@ -96,7 +96,8 @@ impl Renderer {
                 render_pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
                 render_pass.draw_indexed(0..render_batch.get_indices_count(), 0, 0..match render_batch.get_instance_count() {
                     None => {1}
-                    Some(t) => {t as u32}
+                    Some(t) => {
+                        t as u32}
                 });
             }
         }
