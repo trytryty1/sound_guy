@@ -41,8 +41,9 @@
     },
     "Instancing": {
       "Count": 500,
-      "PositionX": 0.0,
+      "PositionX": 2.0,
       "PositionY": 0.0,
+      "PositionZ": 0.0,
       "InstanceRotationFunction": {"InstanceRotationFunction": "Sphere"}
     }
   }

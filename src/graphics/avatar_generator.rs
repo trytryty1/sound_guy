@@ -47,6 +47,7 @@ pub struct InstanceData {
     count: Option<usize>,
     position_x: Option<f32>,
     position_y: Option<f32>,
+    position_z: Option<f32>,
     instance_rotation_function: Option<InstanceRotationFunction>,
 }
 
@@ -112,7 +113,10 @@ pub fn build_avatar(avatar_data: AvatarData, state: &graphics::State) -> Avatar 
         // Instances
         let instance_count = instance_data.count.unwrap_or(1);
         let instances = generate_instances
-            (instance_data.instance_rotation_function.unwrap_or(InstanceRotationFunction::Default), instance_count);
+            (instance_data.instance_rotation_function.unwrap_or(InstanceRotationFunction::Default), instance_count,
+            instance_data.position_x.unwrap_or(0.0),
+            instance_data.position_y.unwrap_or(0.0),
+            instance_data.position_z.unwrap_or(0.0));
         let instance_data = instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
         let instance_buffer = state.device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
@@ -223,7 +227,7 @@ fn get_primitive_topology(render_type: MeshRenderType) -> PrimitiveTopology {
     }
 }
 
-fn generate_instances(instance_rotation_function: InstanceRotationFunction, index_count: usize) -> Vec<Instance> {
+fn generate_instances(instance_rotation_function: InstanceRotationFunction, index_count: usize, position_x: f32, position_y: f32, position_z: f32) -> Vec<Instance> {
     let mut instances: Vec<Instance> = Vec::new();
     match instance_rotation_function {
         InstanceRotationFunction::Default => {
@@ -241,9 +245,9 @@ fn generate_instances(instance_rotation_function: InstanceRotationFunction, inde
             let points = fibonacci_sphere_points(index_count as u32);
 
             for (x,y,z) in points.into_iter() {
-                let pos_x = x * scale;
-                let pos_y = y * scale;
-                let pos_z = z * scale;
+                let pos_x = x * scale + position_x;
+                let pos_y = y * scale + position_y;
+                let pos_z = z * scale + position_z;
                 instances.push(Instance {
                     position: cgmath::Vector3 {x:pos_x , y:pos_y, z:pos_z},
                     rotation: cgmath::Quaternion::from_axis_angle(Vector3::new(0.0,0.0,0.0), cgmath::Deg(45.0))
