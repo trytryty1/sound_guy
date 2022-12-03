@@ -445,9 +445,11 @@ fn window_events(window: &mut Window, event: &WindowEvent) {
     };
 }
 
+const ICON_IMAGE_PATH: &str = "sound_guy_icon.png";
+
 fn load_icon() -> Icon {
     let (icon_rgba, icon_width, icon_height) = {
-        let image = image::open("C:\\Users\\wing_\\IdeaProjects\\sound_guy\\src\\wall.png")
+        let image = image::open(ICON_IMAGE_PATH)
             .expect("Failed to open icon path")
             .into_rgba8();
         let (width, height) = image.dimensions();

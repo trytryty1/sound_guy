@@ -33,9 +33,9 @@
       "SourceFile": "shader.wgsl"
     },
     "MeshGeneration": {
-      "MeshGenFunction": {"MeshGenFunction": "Loaded", "file": "monkey.obj"},
+      "MeshGenFunction": {"MeshGenFunction": "Fibonacci"},
       "MeshRenderType": {"MeshRenderType": "Triangles"},
-      "Sample": 500,
+      "Sample": 2000,
       "MeshColorFunction": {"MeshColorFunction": "Rainbow"},
       "Size": 1.0
     },
