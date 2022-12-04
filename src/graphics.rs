@@ -7,8 +7,11 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 use winit::dpi::{LogicalSize};
+use winit::dpi::PhysicalPosition;
 use winit::platform::windows::{WindowBuilderExtWindows};
 use winit::window::{Icon};
+
+use std::time::Instant;
 
 mod avatar;
 mod model;
@@ -19,7 +22,7 @@ mod avatar_generator;
 
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
-use crate::graphics::camera::{Camera, CameraController, CameraUniform};
+use crate::graphics::camera::{Camera, CameraController, CameraUniform, Projection};
 use crate::graphics::renderer::Renderer;
 use crate::{AUDIO_IN, graphics, Settings};
 
@@ -46,6 +49,7 @@ pub struct State {
 
     // Camera stuff
     camera: Camera,
+    projection: Projection,
     camera_controller: CameraController,
     camera_uniform: CameraUniform,
 
@@ -53,7 +57,9 @@ pub struct State {
     time: f32,
 
     default_bind_group: DefaultBindGroups,
-    depth_texture: graphics::texture::Texture,
+    depth_texture: texture::Texture,
+
+    mouse_pressed: bool,
 }
 
 impl State {
@@ -105,19 +111,12 @@ impl State {
 
         let depth_texture = texture::Texture::create_depth_texture(&device, &config, "depth_texture");
 
-        let camera = Camera {
-            eye: (0.0, 1.0, 2.0).into(),
-            target: (0.0, 0.0, 0.0).into(),
-            up: cgmath::Vector3::unit_y(),
-            aspect: config.width as f32 / config.height as f32,
-            fovy: 45.0,
-            znear: 0.1,
-            zfar: 100.0,
-        };
-        let camera_controller = CameraController::new(0.2);
+        let camera = camera::Camera::new((0.0, 5.0, 10.0), cgmath::Deg(-90.0), cgmath::Deg(-20.0));
+        let projection = camera::Projection::new(config.width, config.height, cgmath::Deg(45.0), 0.1, 100.0);
+        let camera_controller = camera::CameraController::new(4.0, 0.4);
 
         let mut camera_uniform = CameraUniform::new();
-        camera_uniform.update_view_proj(&camera);
+        camera_uniform.update_view_proj(&camera, &projection);
 
 
         // #########################################################
@@ -232,6 +231,7 @@ impl State {
 
 
             camera,
+            projection,
             camera_controller,
             camera_uniform,
 
@@ -239,6 +239,8 @@ impl State {
             default_bind_group: default_bind_group_struct,
 
             depth_texture,
+
+            mouse_pressed: false,
         }
     }
 
@@ -246,27 +248,49 @@ impl State {
 
 
         if new_size.width > 0 && new_size.height > 0 {
+            self.projection.resize(new_size.width, new_size.height);
             self.size = new_size;
             self.config.width = new_size.width;
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
-
-            self.camera.aspect = self.config.width as f32 / self.config.height as f32;
-
-            self.depth_texture = texture::Texture::create_depth_texture(&self.device, &self.config, "depth_texture");
+            self.depth_texture =
+                texture::Texture::create_depth_texture(&self.device, &self.config, "depth_texture");
         }
     }
 
     fn input(&mut self, event: &WindowEvent) -> bool {
-        self.camera_controller.process_events(event)
+        match event {
+            WindowEvent::KeyboardInput {
+                input:
+                KeyboardInput {
+                    virtual_keycode: Some(key),
+                    state,
+                    ..
+                },
+                ..
+            } => self.camera_controller.process_keyboard(*key, *state),
+            WindowEvent::MouseWheel { delta, .. } => {
+                self.camera_controller.process_scroll(delta);
+                true
+            }
+            WindowEvent::MouseInput {
+                button: MouseButton::Left,
+                state,
+                ..
+            } => {
+                self.mouse_pressed = *state == ElementState::Pressed;
+                true
+            }
+            _ => false,
+        }
     }
 
-    unsafe fn update(&mut self) {
+    unsafe fn update(&mut self, dt: std::time::Duration) {
         // Update time
         self.time += 0.05;
 
-        self.camera_controller.update_camera(&mut self.camera);
-        self.camera_uniform.update_view_proj(&self.camera);
+        self.camera_controller.update_camera(&mut self.camera, dt);
+        self.camera_uniform.update_view_proj(&self.camera, &self.projection);
         self.queue.write_buffer(
             &self.default_bind_group.camera_buffer,
             0,
@@ -333,8 +357,9 @@ pub async fn run(settings: &Settings) {
     // State::new uses async code, so we're going to wait for it to finish
     let mut state = State::new(&window).await;
     let mut renderer = Renderer::new();
+    let mut last_render_time = Instant::now();
 
-    let avatar: crate::graphics::avatar::Avatar = avatar_generator::build_avatar(avatar_generator::load_avatar_data().unwrap(), &state);
+    let avatar: avatar::Avatar = avatar_generator::build_avatar(avatar_generator::load_avatar_data().unwrap(), &state);
     for avatar_module in avatar.avatar_modules.into_iter() {
         renderer.add_render_batch(Box::new(avatar_module));
     }
@@ -362,7 +387,10 @@ pub async fn run(settings: &Settings) {
                 }
             }
             Event::RedrawRequested(window_id) if window_id == window.id() => unsafe {
-                state.update();
+                let now = Instant::now();
+                let dt = now - last_render_time;
+                last_render_time = now;
+                state.update(dt);
                 match renderer.render(&state) {
                     Ok(_) => {}
                     // Reconfigure the surface if it's lost or outdated
@@ -432,7 +460,6 @@ fn window_events(window: &mut Window, event: &WindowEvent) {
                 VirtualKeyCode::LShift => {
 
                 }
-
                 _ => {}
             }
         },
@@ -459,3 +486,4 @@ fn load_icon() -> Icon {
 
     Icon::from_rgba(icon_rgba, icon_width, icon_height).unwrap()
 }
+

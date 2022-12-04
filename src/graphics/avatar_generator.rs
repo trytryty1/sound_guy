@@ -250,8 +250,8 @@ fn generate_instances(instance_rotation_function: InstanceRotationFunction, inde
                 let pos_y = y * scale + position_y;
                 let pos_z = z * scale + position_z;
                 instances.push(Instance {
-                    position: cgmath::Vector3 {x:pos_x , y:pos_y, z:pos_z},
-                    rotation: cgmath::Quaternion::from_axis_angle(Vector3::new(0.0,0.0,0.0), cgmath::Deg(45.0))
+                    position: Vector3 {x:pos_x , y:pos_y, z:pos_z},
+                    rotation: Quaternion::from_axis_angle(Vector3::new(0.0,0.0,0.0), cgmath::Deg(45.0))
                 });
             }
         }
@@ -275,9 +275,8 @@ fn color_mesh(color_function: MeshColorFunction, mesh: &mut Mesh) {
 }
 
 fn color_mesh_rainbow(mesh: &mut Mesh) {
-    let vertex_count = mesh.vertices.len();
+    mesh.vertices.len();
     for (index, mut vertex) in mesh.vertices.clone().into_iter().enumerate() {
-        let index_as_float = index as f32/ vertex_count as f32;
         let r = (vertex.position[0] + 1.0) / 2.0;
         let g = (vertex.position[1] + 1.0) / 2.0;
         let b = (vertex.position[2] + 1.0) / 2.0;
