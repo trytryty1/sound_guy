@@ -5,9 +5,9 @@ use serde::*;
 use wgpu::PrimitiveTopology;
 use wgpu::util::DeviceExt;
 use crate::graphics;
-use crate::graphics::{avatar, texture};
 use crate::graphics::avatar::{Avatar, AvatarModule};
 use crate::graphics::model::Instance;
+use crate::graphics::model::mesh_generation::*;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -19,6 +19,7 @@ pub struct AvatarData {
 #[serde(rename_all = "PascalCase")]
 pub struct AvatarModuleData {
     module_name: String,
+    visible: bool,
     shader_data: ShaderData,
     mesh_generation: MeshData,
     instancing: InstanceData,
@@ -47,7 +48,8 @@ pub struct InstanceData {
     count: Option<usize>,
     position_x: Option<f32>,
     position_y: Option<f32>,
-    rotation: Option<InstanceRotationFunction>,
+    position_z: Option<f32>,
+    instance_rotation_function: Option<InstanceRotationFunction>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -59,7 +61,7 @@ pub enum ShaderUniforms {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "MeshGenFunction")]
 pub enum MeshGenFunction {
-    Fibonacci,
+    Fibonacci, Cube, Loaded {file: String},
 }
 
 #[derive(Serialize, Deserialize)]
@@ -74,7 +76,7 @@ pub enum MeshColorFunction {
     Rainbow, Black, White,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "InstanceRotationFunction")]
 pub enum InstanceRotationFunction {
     Default, Sphere,
@@ -88,8 +90,6 @@ pub fn load_avatar_data() -> Result<AvatarData, String> {
         Err(_) => {"Could not load file".to_string()}
     };
 
-    println!("Settings: {}", file);
-
     let json : AvatarData = serde_json::from_str(&file).expect("JSON was not well-formatted");
     return Ok(json);
 }
@@ -102,10 +102,11 @@ pub fn build_avatar(avatar_data: AvatarData, state: &graphics::State) -> Avatar 
         let shader_data = avatar_module_data.shader_data;
         let mesh_data = avatar_module_data.mesh_generation;
         let instance_data = avatar_module_data.instancing;
-
         // Create mesh
         let mut mesh = match mesh_data.mesh_gen_function.unwrap_or(MeshGenFunction::Fibonacci) {
-            MeshGenFunction::Fibonacci => {gen_fibonacci_mesh()}
+            MeshGenFunction::Fibonacci => {gen_fibonacci_mesh(mesh_data.sample.unwrap_or(25) as u32)},
+            MeshGenFunction::Cube => {gen_cube_mesh()},
+            MeshGenFunction::Loaded {file} => {load_mesh_from_file(file)}
         };
         color_mesh(mesh_data.mesh_color_function.unwrap_or(MeshColorFunction::Rainbow), &mut mesh);
 
@@ -113,7 +114,10 @@ pub fn build_avatar(avatar_data: AvatarData, state: &graphics::State) -> Avatar 
         // Instances
         let instance_count = instance_data.count.unwrap_or(1);
         let instances = generate_instances
-            (instance_data.rotation.unwrap_or(InstanceRotationFunction::Default), instance_count);
+            (instance_data.instance_rotation_function.unwrap_or(InstanceRotationFunction::Default), instance_count,
+            instance_data.position_x.unwrap_or(0.0),
+            instance_data.position_y.unwrap_or(0.0),
+            instance_data.position_z.unwrap_or(0.0));
         let instance_data = instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
         let instance_buffer = state.device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
@@ -123,10 +127,17 @@ pub fn build_avatar(avatar_data: AvatarData, state: &graphics::State) -> Avatar 
             }
         );
 
+
+        // Load file source
+        let shader_source = match fs::read_to_string(shader_data.source_file.unwrap_or("shader.wgsl".to_string())) {
+            Ok(t) => {t}
+            Err(_) => {"Could not load file".to_string()}
+        };
+
         // Shader
         let shader = state.device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(shader_source.into()),
         });
 
         // Render Pipeline
@@ -194,6 +205,7 @@ pub fn build_avatar(avatar_data: AvatarData, state: &graphics::State) -> Avatar 
         
         avatar_modules.push(AvatarModule {
             module_name: avatar_module_data.module_name,
+            visible: avatar_module_data.visible,
             render_pipeline,
             vertex_buffer,
             index_buffer,
@@ -216,7 +228,7 @@ fn get_primitive_topology(render_type: MeshRenderType) -> PrimitiveTopology {
     }
 }
 
-fn generate_instances(instance_rotation_function: InstanceRotationFunction, index_count: usize) -> Vec<Instance> {
+fn generate_instances(instance_rotation_function: InstanceRotationFunction, index_count: usize, position_x: f32, position_y: f32, position_z: f32) -> Vec<Instance> {
     let mut instances: Vec<Instance> = Vec::new();
     match instance_rotation_function {
         InstanceRotationFunction::Default => {
@@ -230,13 +242,16 @@ fn generate_instances(instance_rotation_function: InstanceRotationFunction, inde
             });
         }
         InstanceRotationFunction::Sphere => {
+            let scale: f32 = 5.0;
             let points = fibonacci_sphere_points(index_count as u32);
-            let mut instances: Vec<Instance> = Vec::new();
 
             for (x,y,z) in points.into_iter() {
+                let pos_x = x * scale + position_x;
+                let pos_y = y * scale + position_y;
+                let pos_z = z * scale + position_z;
                 instances.push(Instance {
-                    position: cgmath::Vector3 {x , y, z},
-                    rotation: cgmath::Quaternion::from_axis_angle(Vector3::new(0.0,0.0,0.0), cgmath::Deg(45.0))
+                    position: Vector3 {x:pos_x , y:pos_y, z:pos_z},
+                    rotation: Quaternion::from_axis_angle(Vector3::new(0.0,0.0,0.0), cgmath::Deg(45.0))
                 });
             }
         }
@@ -260,10 +275,15 @@ fn color_mesh(color_function: MeshColorFunction, mesh: &mut Mesh) {
 }
 
 fn color_mesh_rainbow(mesh: &mut Mesh) {
-    let vertex_count = mesh.vertices.len();
+    mesh.vertices.len();
     for (index, mut vertex) in mesh.vertices.clone().into_iter().enumerate() {
-        mesh.vertices[index].color = [f32::sin(index as f32),f32::cos(index as f32),f32::sin((1.0 - index as f32 / vertex_count as f32) as f32)];
+        let r = (vertex.position[0] + 1.0) / 2.0;
+        let g = (vertex.position[1] + 1.0) / 2.0;
+        let b = (vertex.position[2] + 1.0) / 2.0;
+        mesh.vertices[index].color = [r, g, b];
     }
+    // Set the center color to black
+    mesh.vertices[0].color = [1.0,0.0,1.0];
 }
 
 fn color_mesh_solid_color(mesh: &mut Mesh, color: [f32; 3]) {
@@ -275,129 +295,6 @@ fn color_mesh_solid_color(mesh: &mut Mesh, color: [f32; 3]) {
 
 // #######################################
 // ####### Mesh generation ###############
-pub fn gen_outer_mesh() -> Mesh {
-    let samples = 50;
-
-    let points = fibonacci_sphere_points(samples);
-
-    let mut vertices: Vec<Vertex> = Vec::new();
-    let mut indices: Vec<u16> = Vec::new();
-
-    for (index, (x, y , z)) in points.into_iter().enumerate() {
-        let r:f32 = (x + 1.0)/2.0;
-        let g:f32 = (y + 1.0)/2.0;
-        let b:f32 = (z + 1.0)/2.0;
-
-        vertices.push(Vertex {position: [x*1.5, y*1.5, z*1.5],
-            color:[r,g,b],
-            index: if index % 11 == 0 {1.0} else {0.0}});
-
-        indices.push(0);
-        indices.push(index as u16);
-
-    }
-
-    Mesh::new(vertices, indices)
-
-}
-
-
-pub fn gen_fibonacci_mesh() -> Mesh { //-> &[Vertex] {
-    let samples = 1100;
-
-    let points = fibonacci_sphere_points(samples);
-
-    let mut vertices: Vec<Vertex> = Vec::new();
-    let mut indices: Vec<u16> = Vec::new();
-
-    // Add the center vertices
-    vertices.push(Vertex {position:[0.0,0.0,0.0], color:[0.0,0.0,0.0], index:0f32});
-
-    for (index, (x, y , z)) in points.into_iter().enumerate() {
-        let r:f32 = (x + 1.0)/2.0;
-        let g:f32 = (y + 1.0)/2.0;
-        let b:f32 = (z + 1.0)/2.0;
-
-        vertices.push(Vertex {position: [x, y, z],
-            color:[r,g,b],
-            index: if index % 11 == 0 {1.0} else {0.0}});
-
-        indices.push(0);
-        indices.push(index as u16);
-
-    }
-
-    Mesh::new(vertices, indices)
-}
-
-fn gen_triangle_mesh() -> Mesh {
-
-    let mut vertices: Vec<Vertex> = Vec::new();
-    let mut indices: Vec<u16> = Vec::new();
-    let size: f32 = 0.03;
-
-    vertices.push(Vertex {
-        position: [size, size, size],
-        color: [1.0,0.0,0.0],
-        index: 0.9
-    });
-    vertices.push(Vertex {
-        position: [size, 0.00, size],
-        color: [0.0,1.0,0.0],
-        index: 0.6
-    });
-    vertices.push(Vertex {
-        position: [0.00, size, size],
-        color: [0.0,0.0,1.0],
-        index: 0.3
-    });
-    vertices.push(Vertex {
-        position: [size, size, 0.0],
-        color: [0.0,0.0,1.0],
-        index: 0.3
-    });
-    vertices.push(Vertex {
-        position: [size, 0.0, 0.0],
-        color: [0.0,0.0,1.0],
-        index: 0.3
-    });
-
-    indices.push(0);
-    indices.push(1);
-    indices.push(2);
-    indices.push(0);
-    indices.push(1);
-    indices.push(3);
-    indices.push(0);
-    indices.push(2);
-    indices.push(3);
-
-    Mesh {
-        vertices,
-        indices,
-    }
-}
-
-fn fibonacci_sphere_points(samples: u32) -> Vec<(f32, f32, f32)> {
-
-    let mut points: Vec<(f32, f32, f32)> = Vec::new();
-    let phi = std::f32::consts::PI * (3.0 - f32::sqrt(5.0));
-
-    for i in 0..samples {
-        let y = 1.0 - (i as f32 / ((samples as f32 - 1.0) as f32)) * 2.0;
-        let radius = f32::sqrt(1.0 - y * y);
-
-        let theta = phi * i as f32;
-
-        let x = f32::cos(theta) * radius;
-        let z = f32::sin(theta) * radius;
-
-        points.push((x, y, z));
-    }
-
-    return points;
-}
-
 
 #[cfg(test)]
 pub mod test {

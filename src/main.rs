@@ -5,7 +5,6 @@ extern crate core;
 mod graphics;
 
 use std::fs;
-use std::fs::File;
 use clap::Parser;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::Stream;
@@ -22,6 +21,7 @@ pub struct Settings {
     default_height: i32,
     always_on_top: bool,
     title: String,
+    camera_rotation: bool,
 }
 
 impl Settings {

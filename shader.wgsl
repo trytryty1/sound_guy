@@ -6,8 +6,9 @@ struct CameraUniform {
 
 @group(0) @binding(0) // 1.
 var<uniform> camera: CameraUniform;
-
-@group(1) @binding(0)
+@group(0) @binding(1)
+var<uniform> time: f32;
+@group(0) @binding(2)
 var<uniform> audio_in: f32;
 
 struct VertexInput {
@@ -26,6 +27,7 @@ struct InstanceInput {
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) color: vec3<f32>,
+    @location(1) index: f32,
 }
 
 @vertex
@@ -40,13 +42,13 @@ fn vs_main(
         instance.model_matrix_3,
     );
     var out: VertexOutput;
-    out.color = vec3<f32>(1.0,1.0,1.0) - model.color;
-    out.clip_position = camera.view_proj * model_matrix * vec4<f32>(model.position.xyz * ((audio_in/2.0)+0.5) , 1.0); // 2.
+    out.color = model.color.xyz;
+    out.clip_position = camera.view_proj * model_matrix * vec4<f32>(model.position.xyz, 1.0); // 2.
+    out.index = model.index;
     return out;
 }
 
 // Fragment shader
-
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     return vec4<f32>(in.color, 0.0);

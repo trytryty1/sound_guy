@@ -2,17 +2,40 @@
   "AvatarModuleData": [
   {
     "ModuleName": "InnerShell",
+    "Visible": false,
     "ShaderData": {
       "ShaderUniform": [
-        "Default",
-        "Audio"
+        "Default"
       ],
       "SourceFile": "shader.wgsl"
     },
     "MeshGeneration": {
       "MeshGenFunction": {"MeshGenFunction": "Fibonacci"},
       "MeshRenderType": {"MeshRenderType": "Lines"},
-      "Sample": 150,
+      "Sample": 500,
+      "MeshColorFunction": {"MeshColorFunction": "Black"},
+      "Size": 1.0
+    },
+    "Instancing": {
+      "Count": 40,
+      "PositionX": 0.0,
+      "PositionY": 0.0,
+      "InstanceRotationFunction": {"InstanceRotationFunction": "Sphere"}
+    }
+  },
+  {
+    "ModuleName": "OuterShell",
+    "Visible": true,
+    "ShaderData": {
+      "ShaderUniform": [
+        "Default"
+      ],
+      "SourceFile": "shader.wgsl"
+    },
+    "MeshGeneration": {
+      "MeshGenFunction": {"MeshGenFunction": "Fibonacci"},
+      "MeshRenderType": {"MeshRenderType": "Triangles"},
+      "Sample": 2000,
       "MeshColorFunction": {"MeshColorFunction": "Rainbow"},
       "Size": 1.0
     },
@@ -20,29 +43,7 @@
       "Count": 1,
       "PositionX": 0.0,
       "PositionY": 0.0,
-      "InstanceRotationFunction": {"InstanceRotationFunction": "Default"}
-    }
-  },
-  {
-    "ModuleName": "OuterShell",
-    "ShaderData": {
-      "ShaderUniform": [
-        "Default",
-        "Audio"
-      ],
-      "SourceFile": "shader.wgsl"
-    },
-    "MeshGeneration": {
-      "MeshGenFunction": {"MeshGenFunction": "Fibonacci"},
-      "MeshRenderType": {"MeshRenderType": "Triangles"},
-      "Sample": 150,
-      "MeshColorFunction": {"MeshColorFunction": "White"},
-      "Size": 1.0
-    },
-    "Instancing": {
-      "Count": 1,
-      "PositionX": 0.0,
-      "PositionY": 0.0,
+      "PositionZ": 0.0,
       "InstanceRotationFunction": {"InstanceRotationFunction": "Default"}
     }
   }
