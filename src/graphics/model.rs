@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io::BufReader;
+use cgmath::Vector3;
 
 
 #[repr(C)]
@@ -16,6 +17,7 @@ pub struct Vertex {
 pub(crate) struct Instance {
     pub(crate) position: cgmath::Vector3<f32>,
     pub(crate) rotation: cgmath::Quaternion<f32>,
+    pub(crate) scale: f32,
 }
 
 // TODO: move this method to a more appropriate place
@@ -28,7 +30,10 @@ pub(crate) struct InstanceRaw {
 impl Instance {
     pub(crate) fn to_raw(&self) -> InstanceRaw {
         InstanceRaw {
-            model: (cgmath::Matrix4::from_translation(self.position) * cgmath::Matrix4::from(self.rotation)).into(),
+            model: (
+                cgmath::Matrix4::from_translation(self.position ) * cgmath::Matrix4::from_scale(self.scale) *
+                cgmath::Matrix4::from(self.rotation))
+                .into(),
         }
     }
 }

@@ -19,6 +19,7 @@ mod camera;
 mod renderer;
 mod texture;
 mod avatar_generator;
+mod avatar_modifiers;
 
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
@@ -335,6 +336,7 @@ pub async fn run(settings: &Settings) {
     
     window.set_cursor_hittest(false).expect("TODO: panic message");
 
+
     #[cfg(target_arch = "wasm32")]
     {
         // Winit prevents sizing with CSS, so we have to set
@@ -366,6 +368,13 @@ pub async fn run(settings: &Settings) {
 
     event_loop.run(move |event, _, control_flow| {
         match event {
+
+            Event::DeviceEvent {
+                event,
+                ..
+            } => {
+                device_events(&mut window, &event);
+            }
             Event::WindowEvent {
                 ref event,
                 window_id,
@@ -406,12 +415,7 @@ pub async fn run(settings: &Settings) {
                 // request it.
                 window.request_redraw();
             }
-            Event::DeviceEvent {
-                event,
-                ..
-            } => {
-                device_events(&mut window, &event);
-            }
+
             _ => {}
         }
     });

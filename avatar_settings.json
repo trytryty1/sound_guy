@@ -2,7 +2,7 @@
   "AvatarModuleData": [
   {
     "ModuleName": "InnerShell",
-    "Visible": false,
+    "Visible": true,
     "ShaderData": {
       "ShaderUniform": [
         "Default"
@@ -11,16 +11,18 @@
     },
     "MeshGeneration": {
       "MeshGenFunction": {"MeshGenFunction": "Fibonacci"},
-      "MeshRenderType": {"MeshRenderType": "Lines"},
+      "MeshRenderType": {"MeshRenderType": "Triangles"},
       "Sample": 500,
-      "MeshColorFunction": {"MeshColorFunction": "Black"},
+      "MeshColorFunction": {"MeshColorFunction": "Rainbow"},
       "Size": 1.0
     },
     "Instancing": {
-      "Count": 40,
+      "Count": 1,
       "PositionX": 0.0,
       "PositionY": 0.0,
-      "InstanceRotationFunction": {"InstanceRotationFunction": "Sphere"}
+      "PositionZ": 0.0,
+      "Scale": 1.0,
+      "InstanceRotationFunction": {"InstanceRotationFunction": "Default"}
     }
   },
   {
@@ -33,18 +35,19 @@
       "SourceFile": "shader.wgsl"
     },
     "MeshGeneration": {
-      "MeshGenFunction": {"MeshGenFunction": "Fibonacci"},
+      "MeshGenFunction": {"MeshGenFunction": "Cube"},
       "MeshRenderType": {"MeshRenderType": "Triangles"},
       "Sample": 2000,
       "MeshColorFunction": {"MeshColorFunction": "Rainbow"},
       "Size": 1.0
     },
     "Instancing": {
-      "Count": 1,
+      "Count": 25,
       "PositionX": 0.0,
       "PositionY": 0.0,
       "PositionZ": 0.0,
-      "InstanceRotationFunction": {"InstanceRotationFunction": "Default"}
+      "Scale": 0.2,
+      "InstanceRotationFunction": {"InstanceRotationFunction": "Sphere"}
     }
   }
   ]

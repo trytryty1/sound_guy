@@ -136,9 +136,11 @@ impl CameraController {
         let amount = if state == ElementState::Pressed { 1.0 } else { 0.0 };
         match key {
             VirtualKeyCode::W | VirtualKeyCode::Up => {
+                self.radius -= self.speed;
                 true
             }
             VirtualKeyCode::S | VirtualKeyCode::Down => {
+                self.radius += self.speed;
                 true
             }
             VirtualKeyCode::A | VirtualKeyCode::Left => {
@@ -162,7 +164,12 @@ impl CameraController {
     }
 
     pub fn process_scroll(&mut self, delta: &MouseScrollDelta) {
-
+        match delta {
+            MouseScrollDelta::LineDelta(x, y) => {
+                self.radius += y + x;
+            }
+            MouseScrollDelta::PixelDelta(_) => {()}
+        };
     }
 
     pub fn update_camera(&mut self, camera: &mut Camera, dt: Duration) {
