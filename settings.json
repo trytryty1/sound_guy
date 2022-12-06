@@ -6,5 +6,6 @@
 	"DefaultWidth": 400,
 	"DefaultHeight": 400,
 	"AlwaysOnTop": true,
-	"Title": "Sound Guy"
+	"Title": "Sound Guy",
+	"CameraRotation": true
 }

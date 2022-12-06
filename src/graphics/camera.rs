@@ -110,23 +110,24 @@ impl CameraUniform {
 
 pub struct CameraController {
     camera_target: Vector3<f32>,
-    position_change_direction: Vector3<f32>,
 
     radius: f32,
     total_time: f32,
     speed: f32,
     sensitivity: f32,
+
+    camera_rotation: bool,
 }
 
 impl CameraController {
-    pub fn new(speed: f32, sensitivity: f32) -> Self {
+    pub fn new(speed: f32, sensitivity: f32, camera_rotation: bool) -> Self {
         Self {
             camera_target: Vector3::new(1.0, 1.0, 1.0),
-            position_change_direction: Vector3::new(0.0,0.0,0.0),
             radius: 4.0,
             total_time: 0.0,
             speed,
             sensitivity,
+            camera_rotation,
         }
 
     }
@@ -166,15 +167,22 @@ impl CameraController {
 
     pub fn update_camera(&mut self, camera: &mut Camera, dt: Duration) {
         let dt = dt.as_secs_f32();
-        self.total_time = (self.total_time + dt) % (f32::PI()*4.0);
 
 
         camera.position = Point3::from_vec(Vector3::lerp(camera.position.to_vec(), self.camera_target, self.speed * dt));
 
         self.camera_target.x = f32::sin(self.total_time);
         self.camera_target.z = f32::cos(self.total_time);
-        self.camera_target.y = f32::sin(self.total_time/2.0);
+        self.camera_target.y = f32::sin(self.total_time / 2.0);
         self.camera_target = self.camera_target.normalize() * self.radius;
+
+
+        // Only update the time when the sphere is supposed to rotate
+        if self.camera_rotation {
+            self.total_time = (self.total_time + dt) % (f32::PI() * 4.0);
+        } else {
+            self.total_time = 3.0;
+        }
     }
 
 

@@ -63,7 +63,7 @@ pub struct State {
 }
 
 impl State {
-    async fn new(window: &Window) -> Self {
+    async fn new(window: &Window, settings: &Settings) -> Self {
 
         let size = window.inner_size();
 
@@ -113,7 +113,7 @@ impl State {
 
         let camera = camera::Camera::new((0.0, 5.0, 10.0), cgmath::Deg(-90.0), cgmath::Deg(-20.0));
         let projection = camera::Projection::new(config.width, config.height, cgmath::Deg(45.0), 0.1, 100.0);
-        let camera_controller = camera::CameraController::new(4.0, 0.4);
+        let camera_controller = camera::CameraController::new(4.0, 0.4, settings.camera_rotation);
 
         let mut camera_uniform = CameraUniform::new();
         camera_uniform.update_view_proj(&camera, &projection);
@@ -355,7 +355,7 @@ pub async fn run(settings: &Settings) {
     }
 
     // State::new uses async code, so we're going to wait for it to finish
-    let mut state = State::new(&window).await;
+    let mut state = State::new(&window, settings).await;
     let mut renderer = Renderer::new();
     let mut last_render_time = Instant::now();
 
