@@ -1,5 +1,6 @@
 use std::fs;
 use cgmath::{Quaternion, Rotation3, Vector3};
+use rand::random;
 use crate::graphics::model::{InstanceRaw, Mesh, Vertex};
 use serde::*;
 use wgpu::PrimitiveTopology;
@@ -256,7 +257,7 @@ fn generate_instances(instance_rotation_function: InstanceRotationFunction, inde
                 let pos_z = z * sphere_scale + position_z;
                 instances.push(Instance {
                     position: Vector3 {x:pos_x , y:pos_y, z:pos_z},
-                    rotation: Quaternion::from_axis_angle(Vector3::new(0.0,0.0,0.0), cgmath::Deg(45.0)),
+                    rotation: Quaternion::from_axis_angle(Vector3::new(0.0,1.0,0.0), cgmath::Deg(random::<f32>() * 360.0)),
                     scale,
                 });
             }

@@ -22,6 +22,8 @@ pub struct Settings {
     always_on_top: bool,
     title: String,
     camera_rotation: bool,
+    camera_speed: f32,
+    camera_sensitivity: f32,
 }
 
 impl Settings {

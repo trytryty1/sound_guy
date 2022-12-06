@@ -136,11 +136,11 @@ impl CameraController {
         let amount = if state == ElementState::Pressed { 1.0 } else { 0.0 };
         match key {
             VirtualKeyCode::W | VirtualKeyCode::Up => {
-                self.radius -= self.speed;
+                self.radius -= self.sensitivity;
                 true
             }
             VirtualKeyCode::S | VirtualKeyCode::Down => {
-                self.radius += self.speed;
+                self.radius += self.sensitivity;
                 true
             }
             VirtualKeyCode::A | VirtualKeyCode::Left => {
@@ -176,7 +176,7 @@ impl CameraController {
         let dt = dt.as_secs_f32();
 
 
-        camera.position = Point3::from_vec(Vector3::lerp(camera.position.to_vec(), self.camera_target, self.speed * dt));
+        camera.position = Point3::from_vec(Vector3::lerp(camera.position.to_vec(), self.camera_target, dt * self.speed));
 
         self.camera_target.x = f32::sin(self.total_time);
         self.camera_target.z = f32::cos(self.total_time);
@@ -186,7 +186,7 @@ impl CameraController {
 
         // Only update the time when the sphere is supposed to rotate
         if self.camera_rotation {
-            self.total_time = (self.total_time + dt) % (f32::PI() * 4.0);
+            self.total_time = (self.total_time + (dt * self.speed)) % (f32::PI() * 4.0) ;
         } else {
             self.total_time = 3.0;
         }
