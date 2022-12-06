@@ -43,7 +43,7 @@ fn vs_main(
     );
     var out: VertexOutput;
     out.color = model.color.xyz;
-    out.clip_position = camera.view_proj * model_matrix * vec4<f32>(model.position.xyz * (0.5 + audio_in) / 2.0, 1.0); // 2.
+    out.clip_position = camera.view_proj * model_matrix * vec4<f32>(model.position.xyz, 1.0); // 2.
     out.index = model.index;
     return out;
 }

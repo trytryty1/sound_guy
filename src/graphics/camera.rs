@@ -1,7 +1,10 @@
 use std::time::Duration;
-use cgmath::{InnerSpace, Matrix4, perspective, Point3, Rad, Vector3};
+use cgmath::{EuclideanSpace, InnerSpace, Matrix4, MetricSpace, perspective, Point3, Quaternion, Rad, Rotation, Vector2, Vector3, VectorSpace, Zero};
+use cgmath::num_traits::{FloatConst, Pow};
+use rand::random;
 use winit::dpi::PhysicalPosition;
 use winit::event::{ElementState, KeyboardInput, MouseScrollDelta, VirtualKeyCode, WindowEvent};
+use crate::AUDIO_IN;
 use crate::graphics::camera;
 
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
@@ -41,9 +44,9 @@ impl Camera {
         Matrix4::look_to_rh(
             self.position,
             Vector3::new(
-                cos_pitch * cos_yaw,
-                sin_pitch,
-                cos_pitch * sin_yaw
+                self.position.x * -1.0,
+                self.position.y * -1.0,
+                self.position.z * -1.0,
             ).normalize(),
             Vector3::unit_y(),
         )
@@ -106,15 +109,11 @@ impl CameraUniform {
 }
 
 pub struct CameraController {
-    amount_left: f32,
-    amount_right: f32,
-    amount_forward: f32,
-    amount_backward: f32,
-    amount_up: f32,
-    amount_down: f32,
-    rotate_horizontal: f32,
-    rotate_vertical: f32,
-    scroll: f32,
+    camera_target: Vector3<f32>,
+    position_change_direction: Vector3<f32>,
+
+    radius: f32,
+    total_time: f32,
     speed: f32,
     sensitivity: f32,
 }
@@ -122,45 +121,35 @@ pub struct CameraController {
 impl CameraController {
     pub fn new(speed: f32, sensitivity: f32) -> Self {
         Self {
-            amount_left: 0.0,
-            amount_right: 0.0,
-            amount_forward: 0.0,
-            amount_backward: 0.0,
-            amount_up: 0.0,
-            amount_down: 0.0,
-            rotate_horizontal: 0.0,
-            rotate_vertical: 0.0,
-            scroll: 0.0,
+            camera_target: Vector3::new(1.0, 1.0, 1.0),
+            position_change_direction: Vector3::new(0.0,0.0,0.0),
+            radius: 4.0,
+            total_time: 0.0,
             speed,
             sensitivity,
         }
+
     }
 
     pub fn process_keyboard(&mut self, key: VirtualKeyCode, state: ElementState) -> bool{
         let amount = if state == ElementState::Pressed { 1.0 } else { 0.0 };
         match key {
             VirtualKeyCode::W | VirtualKeyCode::Up => {
-                self.amount_forward = amount;
                 true
             }
             VirtualKeyCode::S | VirtualKeyCode::Down => {
-                self.amount_backward = amount;
                 true
             }
             VirtualKeyCode::A | VirtualKeyCode::Left => {
-                self.amount_left = amount;
                 true
             }
             VirtualKeyCode::D | VirtualKeyCode::Right => {
-                self.amount_right = amount;
                 true
             }
             VirtualKeyCode::Space => {
-                self.amount_up = amount;
                 true
             }
             VirtualKeyCode::LShift => {
-                self.amount_down = amount;
                 true
             }
             _ => false,
@@ -168,53 +157,25 @@ impl CameraController {
     }
 
     pub fn process_mouse(&mut self, mouse_dx: f64, mouse_dy: f64) {
-        self.rotate_horizontal = mouse_dx as f32;
-        self.rotate_vertical = mouse_dy as f32;
+
     }
 
     pub fn process_scroll(&mut self, delta: &MouseScrollDelta) {
-        self.scroll = -match delta {
-            // I'm assuming a line is about 100 pixels
-            MouseScrollDelta::LineDelta(_, scroll) => scroll * 100.0,
-            MouseScrollDelta::PixelDelta(PhysicalPosition {
-                                             y: scroll,
-                                             ..
-                                         }) => *scroll as f32,
-        };
+
     }
 
     pub fn update_camera(&mut self, camera: &mut Camera, dt: Duration) {
         let dt = dt.as_secs_f32();
+        self.total_time = (self.total_time + dt) % (f32::PI()*4.0);
 
-        // Move forward/backward and left/right
-        let (yaw_sin, yaw_cos) = camera.yaw.0.sin_cos();
-        let forward = Vector3::new(yaw_cos, 0.0, yaw_sin).normalize();
-        let right = Vector3::new(-yaw_sin, 0.0, yaw_cos).normalize();
-        camera.position += forward * (self.amount_forward - self.amount_backward) * self.speed * dt;
-        camera.position += right * (self.amount_right - self.amount_left) * self.speed * dt;
 
-        // Move in/out (aka. "zoom")
-        // Note: this isn't an actual zoom. The camera's position
-        // changes when zooming. I've added this to make it easier
-        // to get closer to an object you want to focus on.
-        let (pitch_sin, pitch_cos) = camera.pitch.0.sin_cos();
-        let scrollward = Vector3::new(pitch_cos * yaw_cos, pitch_sin, pitch_cos * yaw_sin).normalize();
-        camera.position += scrollward * self.scroll * self.speed * self.sensitivity * dt;
-        self.scroll = 0.0;
+        camera.position = Point3::from_vec(Vector3::lerp(camera.position.to_vec(), self.camera_target, self.speed * dt));
 
-        // Move up/down. Since we don't use roll, we can just
-        // modify the y coordinate directly.
-        camera.position.y += (self.amount_up - self.amount_down) * self.speed * dt;
-
-        // Rotate
-        camera.yaw += Rad(self.rotate_horizontal) * self.sensitivity * dt;
-        camera.pitch += Rad(-self.rotate_vertical) * self.sensitivity * dt;
-
-        // If process_mouse isn't called every frame, these values
-        // will not get set to zero, and the camera will rotate
-        // when moving in a non cardinal direction.
-        self.rotate_horizontal = 0.0;
-        self.rotate_vertical = 0.0;
-
+        self.camera_target.x = f32::sin(self.total_time);
+        self.camera_target.z = f32::cos(self.total_time);
+        self.camera_target.y = f32::sin(self.total_time/2.0);
+        self.camera_target = self.camera_target.normalize() * self.radius;
     }
+
+
 }
