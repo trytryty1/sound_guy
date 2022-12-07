@@ -7,7 +7,7 @@
       "ShaderUniform": [
         "Default"
       ],
-      "SourceFile": "shader.wgsl"
+      "SourceFile": "resources/shader.wgsl"
     },
     "MeshGeneration": {
       "MeshGenFunction": {"MeshGenFunction": "Fibonacci"},
@@ -32,11 +32,11 @@
       "ShaderUniform": [
         "Default"
       ],
-      "SourceFile": "shader.wgsl"
+      "SourceFile": "resources/shader.wgsl"
     },
     "MeshGeneration": {
       "MeshGenFunction": {"MeshGenFunction": "Loaded",
-        "file": "spikey_ball.obj"
+        "file": "resources/models/spikey_ball.obj"
       },
       "MeshRenderType": {"MeshRenderType": "Triangles"},
       "Sample": 2000,

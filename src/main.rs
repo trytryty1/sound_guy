@@ -29,7 +29,7 @@ pub struct Settings {
 impl Settings {
     fn load_settings() -> Settings {
         // Load file as string
-        let mut file = match fs::read_to_string("settings.json") {
+        let mut file = match fs::read_to_string("resources/settings.json") {
             Ok(t) => {t}
             Err(_) => {panic!("Could not load settings from settings.json")}
         };

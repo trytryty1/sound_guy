@@ -84,7 +84,7 @@ pub enum InstanceRotationFunction {
     Default, Sphere,
 }
 
-static AVATAR_DATA_PATH: &str = "avatar_settings.json";
+static AVATAR_DATA_PATH: &str = "resources/avatar_settings.json";
 pub fn load_avatar_data() -> Result<AvatarData, String> {
     // Load file as string
     let file = match fs::read_to_string(AVATAR_DATA_PATH) {

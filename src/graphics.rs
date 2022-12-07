@@ -476,7 +476,7 @@ fn window_events(window: &mut Window, event: &WindowEvent) {
     };
 }
 
-const ICON_IMAGE_PATH: &str = "sound_guy_icon.png";
+const ICON_IMAGE_PATH: &str = "resources/sound_guy_icon.png";
 
 fn load_icon() -> Icon {
     let (icon_rgba, icon_width, icon_height) = {

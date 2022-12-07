@@ -8,6 +8,6 @@
 	"AlwaysOnTop": true,
 	"Title": "Sound Guy",
 	"CameraRotation": true,
-	"CameraSpeed": 5.0,
+	"CameraSpeed": 1.0,
 	"CameraSensitivity": 1.0
 }
