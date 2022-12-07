@@ -32,10 +32,10 @@
       "ShaderUniform": [
         "Default"
       ],
-      "SourceFile": "resources/shader.wgsl"
+      "SourceFile": "resources/shadertime.wgsl"
     },
     "MeshGeneration": {
-      "MeshGenFunction": {"MeshGenFunction": "Loaded",
+      "MeshGenFunction": {"MeshGenFunction": "Cube",
         "file": "resources/models/spikey_ball.obj"
       },
       "MeshRenderType": {"MeshRenderType": "Triangles"},
@@ -44,12 +44,14 @@
       "Size": 1.0
     },
     "Instancing": {
-      "Count": 120,
+      "Count": 500,
       "PositionX": 0.0,
       "PositionY": 0.0,
       "PositionZ": 0.0,
-      "Scale": 0.05,
-      "InstanceRotationFunction": {"InstanceRotationFunction": "Sphere"}
+      "Scale": 0.03 ,
+      "InstanceRotationFunction": {"InstanceRotationFunction": "Sphere",
+        "radius": 1.5
+      }
     }
   }
   ]

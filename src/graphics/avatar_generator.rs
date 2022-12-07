@@ -81,7 +81,7 @@ pub enum MeshColorFunction {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "InstanceRotationFunction")]
 pub enum InstanceRotationFunction {
-    Default, Sphere,
+    Default, Sphere {radius: f32},
 }
 
 static AVATAR_DATA_PATH: &str = "resources/avatar_settings.json";
@@ -247,8 +247,7 @@ fn generate_instances(instance_rotation_function: InstanceRotationFunction, inde
                 scale,
             });
         }
-        InstanceRotationFunction::Sphere => {
-            let sphere_scale: f32 = 2.0;
+        InstanceRotationFunction::Sphere {radius: sphere_scale} => {
             let points = fibonacci_sphere_points(index_count as u32);
 
             for (x,y,z) in points.into_iter() {

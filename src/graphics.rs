@@ -61,6 +61,7 @@ pub struct State {
     depth_texture: texture::Texture,
 
     mouse_pressed: bool,
+    reload_avatar: bool,
 }
 
 impl State {
@@ -242,6 +243,7 @@ impl State {
             depth_texture,
 
             mouse_pressed: false,
+            reload_avatar: false,
         }
     }
 
@@ -367,13 +369,22 @@ pub async fn run(settings: &Settings) {
     }
 
     event_loop.run(move |event, _, control_flow| {
+        if state.reload_avatar {
+            renderer.clear_render_batches();
+            state.reload_avatar = false;
+
+            let avatar: avatar::Avatar = avatar_generator::build_avatar(avatar_generator::load_avatar_data().unwrap(), &state);
+            for avatar_module in avatar.avatar_modules.into_iter() {
+                renderer.add_render_batch(Box::new(avatar_module));
+            }
+        }
         match event {
 
             Event::DeviceEvent {
                 event,
                 ..
             } => {
-                device_events(&mut window, &event);
+                device_events(&mut window, &event, &mut state);
             }
             Event::WindowEvent {
                 ref event,
@@ -423,7 +434,7 @@ pub async fn run(settings: &Settings) {
 
 static mut TAKE_FOCUS: bool = true;
 
-fn device_events(window: &mut Window, event: &DeviceEvent) {
+fn device_events(window: &mut Window, event: &DeviceEvent, state: &mut State) {
     match event {
         DeviceEvent::Added => {}
         DeviceEvent::Removed => {}
@@ -433,12 +444,17 @@ fn device_events(window: &mut Window, event: &DeviceEvent) {
         DeviceEvent::Button { .. } => {}
         DeviceEvent::Key(input) => {
             let is_pressed = input.state == ElementState::Pressed;
-            match input.virtual_keycode.unwrap() {
+            match input.virtual_keycode.unwrap_or(VirtualKeyCode::Apostrophe) {
                 VirtualKeyCode::RShift => unsafe {
                     if is_pressed {
                         window.set_cursor_hittest(TAKE_FOCUS).expect("TODO: panic message");
                         window.set_decorations(TAKE_FOCUS);
                         TAKE_FOCUS = !TAKE_FOCUS;
+                    }
+                }
+                VirtualKeyCode::Tab => {
+                    if is_pressed {
+                        state.reload_avatar = true;
                     }
                 }
                 _ => {}

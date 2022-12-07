@@ -34,6 +34,10 @@ impl Renderer {
         self.render_batches.push(render_batch);
     }
 
+    pub fn clear_render_batches(&mut self) {
+        self.render_batches.clear();
+    }
+
     pub fn render(&mut self, state: &State) -> Result<(), wgpu::SurfaceError> {
         let device = &state.device;
         let surface = &state.surface;
