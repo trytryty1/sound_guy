@@ -32,10 +32,10 @@
       "ShaderUniform": [
         "Default"
       ],
-      "SourceFile": "resources/shadertime.wgsl"
+      "SourceFile": "resources/shader.wgsl"
     },
     "MeshGeneration": {
-      "MeshGenFunction": {"MeshGenFunction": "Cube",
+      "MeshGenFunction": {"MeshGenFunction": "Fibonacci",
         "file": "resources/models/spikey_ball.obj"
       },
       "MeshRenderType": {"MeshRenderType": "Triangles"},

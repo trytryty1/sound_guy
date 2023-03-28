@@ -19,7 +19,6 @@ mod camera;
 mod renderer;
 mod texture;
 mod avatar_generator;
-mod avatar_modifiers;
 
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
