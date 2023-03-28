@@ -5,6 +5,7 @@ extern crate core;
 mod graphics;
 
 use std::fs;
+use std::time::Duration;
 use clap::Parser;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::Stream;
@@ -157,7 +158,7 @@ fn setup_feedback(settings: &Settings) -> Stream {
         "Attempting to build both streams with f32 samples and `{:?}`.",
         config
     );
-    let input_stream = match input_device.build_input_stream(&config, input_data_fn, err_fn) {
+    let input_stream = match input_device.build_input_stream(&config, input_data_fn, err_fn, Some(Duration::from_secs(1000))) {
         Ok(t) => t,
         Err(_) => panic!("NOOOOOO!")
     };

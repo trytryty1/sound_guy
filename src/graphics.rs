@@ -327,7 +327,7 @@ pub async fn run(settings: &Settings) {
     let mut window = WindowBuilder::new()
         .with_decorations(false)
         .with_transparent(settings.transparent_background)
-        .with_always_on_top(settings.always_on_top)
+        // TODO: always on top had to be removed
         .with_inner_size(LogicalSize::new(settings.default_width as f32, settings.default_height as f32))
         .with_title(&settings.title)
         .with_taskbar_icon(Some(load_icon()))
